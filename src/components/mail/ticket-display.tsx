@@ -29,13 +29,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { Ticket } from '@/types/tickos'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import { Ticket, Message } from '@/lib/api-client'
 
 interface TicketDisplayProps {
   ticket: Ticket | null
+  messages: Message[]
 }
 
-export function TicketDisplay({ ticket }: TicketDisplayProps) {
+export function TicketDisplay({ ticket, messages }: TicketDisplayProps) {
   if (!ticket) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-muted-foreground">
@@ -43,8 +46,6 @@ export function TicketDisplay({ ticket }: TicketDisplayProps) {
       </div>
     )
   }
-
-  const messages = ticket.messages || []
 
   return (
     <div className="flex h-full flex-col">
@@ -159,13 +160,13 @@ export function TicketDisplay({ ticket }: TicketDisplayProps) {
               <h3 className="font-semibold mb-2">{ticket.subject}</h3>
             </div>
             {messages.length > 0 ? (
-              messages.map((message) => (
+              messages.map((message: Message) => (
                 <div
                   key={message.id}
                   className={`rounded-lg border p-4 ${
                     message.is_customer
                       ? 'bg-muted/50'
-                      : 'bg-tickos-green-light dark:bg-tickos-green/10'
+                      : 'bg-[#16a349]/10'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">

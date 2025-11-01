@@ -1,6 +1,7 @@
 'use client'
 
 import { LucideIcon } from 'lucide-react'
+import { IconType } from 'react-icons'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import {
@@ -14,7 +15,7 @@ interface NavProps {
   links: {
     title: string
     label?: string
-    icon: LucideIcon
+    icon: LucideIcon | IconType
     variant: 'default' | 'ghost'
     onClick?: () => void
   }[]
