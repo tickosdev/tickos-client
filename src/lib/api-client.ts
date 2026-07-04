@@ -63,6 +63,7 @@ export interface Inbox {
   current_number: number
   status: string
   is_active: boolean
+  signature_html?: string | null
 }
 
 export interface Customer {
@@ -240,6 +241,8 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${endpoint}`
 
   const response = await fetch(url, {
+    // Siempre datos frescos: sin cache del navegador
+    cache: 'no-store',
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -403,48 +406,44 @@ export async function removeTagFromTicket(ticketId: string, tagId: string): Prom
 
 // ---------------------------------------------------
 // API: Bulk Actions
+// El API v1 no tiene endpoints bulk: se hace fan-out por ticket
+// usando /manage y DELETE. Si alguna falla, se lanza error.
 // ---------------------------------------------------
 
+async function bulkManage(ticketIds: string[], action: string, data?: Record<string, unknown>): Promise<void> {
+  const results = await Promise.allSettled(ticketIds.map(id => manageTicket(id, action, data)))
+  const failed = results.filter(r => r.status === 'rejected')
+  if (failed.length > 0) {
+    throw new Error(`${failed.length} of ${ticketIds.length} tickets failed (${action})`)
+  }
+}
+
 export async function bulkMarkRead(ticketIds: string[]): Promise<void> {
-  return request('/tickets/bulk/mark-read', {
-    method: 'POST',
-    body: JSON.stringify({ ticket_ids: ticketIds }),
-  })
+  return bulkManage(ticketIds, 'mark_read')
 }
 
 export async function bulkMarkUnread(ticketIds: string[]): Promise<void> {
-  return request('/tickets/bulk/mark-unread', {
-    method: 'POST',
-    body: JSON.stringify({ ticket_ids: ticketIds }),
-  })
+  return bulkManage(ticketIds, 'mark_unread')
 }
 
 export async function bulkArchive(ticketIds: string[]): Promise<void> {
-  return request('/tickets/bulk/archive', {
-    method: 'POST',
-    body: JSON.stringify({ ticket_ids: ticketIds }),
-  })
+  return bulkManage(ticketIds, 'archive')
 }
 
 export async function bulkUnarchive(ticketIds: string[]): Promise<void> {
-  return request('/tickets/bulk/unarchive', {
-    method: 'POST',
-    body: JSON.stringify({ ticket_ids: ticketIds }),
-  })
+  return bulkManage(ticketIds, 'unarchive')
 }
 
 export async function bulkSnooze(ticketIds: string[], until: string): Promise<void> {
-  return request('/tickets/bulk/snooze', {
-    method: 'POST',
-    body: JSON.stringify({ ticket_ids: ticketIds, snoozed_until: until }),
-  })
+  return bulkManage(ticketIds, 'snooze', { until })
 }
 
 export async function bulkDelete(ticketIds: string[]): Promise<void> {
-  return request('/tickets/bulk/delete', {
-    method: 'POST',
-    body: JSON.stringify({ ticket_ids: ticketIds }),
-  })
+  const results = await Promise.allSettled(ticketIds.map(id => deleteTicket(id)))
+  const failed = results.filter(r => r.status === 'rejected')
+  if (failed.length > 0) {
+    throw new Error(`${failed.length} of ${ticketIds.length} tickets failed (delete)`)
+  }
 }
 
 // ---------------------------------------------------

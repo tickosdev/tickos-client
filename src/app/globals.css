@@ -88,10 +88,10 @@
   }
 }
 
-/* Email content viewer - fondo claro forzado para legibilidad */
+/* Email content viewer - sigue el theme activo (light/dark) */
 .email-content-viewer {
-  background-color: #ffffff !important;
-  color: #1a1a1a !important;
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
   word-wrap: break-word !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
@@ -101,6 +101,7 @@
 
 .email-content-viewer * {
   color: inherit !important;
+  background-color: transparent !important;
   word-wrap: break-word !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;

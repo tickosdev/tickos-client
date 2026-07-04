@@ -16,12 +16,14 @@ import {
 interface DeleteDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  ticketId: string
+  ticketId?: string
+  // Para borrado masivo: cantidad de tickets seleccionados
+  count?: number
   onConfirm: () => void
   isDeleting?: boolean
 }
 
-export function DeleteDialog({ open, onOpenChange, ticketId, onConfirm, isDeleting }: DeleteDialogProps) {
+export function DeleteDialog({ open, onOpenChange, ticketId, count, onConfirm, isDeleting }: DeleteDialogProps) {
   const [confirmText, setConfirmText] = React.useState('')
 
   const canDelete = confirmText === 'DELETE'
@@ -51,11 +53,15 @@ export function DeleteDialog({ open, onOpenChange, ticketId, onConfirm, isDeleti
             <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center">
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </div>
-            <DialogTitle className="text-sm">Delete ticket</DialogTitle>
+            <DialogTitle className="text-sm">
+              {count !== undefined ? `Delete ${count} ticket${count === 1 ? '' : 's'}` : 'Delete ticket'}
+            </DialogTitle>
           </div>
           <DialogDescription className="text-xs pt-2">
-            This action cannot be undone. This will permanently delete ticket{' '}
-            <span className="font-mono font-medium text-foreground">{ticketId}</span>{' '}
+            This action cannot be undone. This will permanently delete{' '}
+            <span className="font-mono font-medium text-foreground">
+              {count !== undefined ? `${count} ticket${count === 1 ? '' : 's'}` : `ticket ${ticketId}`}
+            </span>{' '}
             and all associated messages.
           </DialogDescription>
         </DialogHeader>

@@ -258,6 +258,12 @@ export function TickosClient() {
     try {
       const response = await getTicketMessages(ticketId)
       setMessages(response.data)
+      // Sincronizar el contador de mensajes en la lista (puede estar desactualizado)
+      setTickets(prev => prev.map(t =>
+        t.id === ticketId && t.message_count !== response.data.length
+          ? { ...t, message_count: response.data.length }
+          : t
+      ))
     } catch (error) {
       console.error('Error loading messages:', error)
     } finally {

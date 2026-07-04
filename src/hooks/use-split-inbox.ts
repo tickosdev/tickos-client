@@ -83,6 +83,36 @@ const DEFAULT_VIEWS: SplitInboxView[] = [
 ]
 
 // ---------------------------------------------------
+// Helpers
+// ---------------------------------------------------
+
+// Convierte los filtros de una vista a TicketFilters para el API.
+// Los valores multiples (status, priority) se envian separados por coma.
+export function buildTicketFilters(view: SplitInboxView | undefined, inboxId?: string): TicketFilters {
+  const f = view?.filters || {}
+  const result: TicketFilters = {}
+
+  // El inbox del filtro de la vista tiene precedencia sobre el seleccionado
+  if (f.inbox_id) result.inbox_id = f.inbox_id
+  else if (inboxId) result.inbox_id = inboxId
+
+  if (f.status && f.status.length > 0) result.status = f.status.join(',')
+  if (f.priority && f.priority.length > 0) result.priority = f.priority.join(',')
+  if (f.assignee) result.assigned_to = f.assignee
+  if (f.tag_id) result.tag_id = f.tag_id
+  if (f.read_status === 'read') result.is_read = true
+  if (f.read_status === 'unread') result.is_read = false
+  if (f.show_archived === 'only') result.archived = true
+  else if (f.show_archived === 'exclude' || f.show_archived === false) result.archived = false
+  if (f.show_snoozed === 'only') result.snoozed = 'only_snoozed'
+  else if (f.show_snoozed === 'exclude') result.snoozed = 'exclude_snoozed'
+
+  result.sort_order = view?.sort_order || 'desc'
+
+  return result
+}
+
+// ---------------------------------------------------
 // Atoms (persisted in localStorage)
 // ---------------------------------------------------
 
@@ -191,29 +221,8 @@ export function useSplitInbox() {
   }
 
   // Convert SplitInboxFilters to TicketFilters for API calls
-  // Los valores multiples (status, priority) se envian separados por coma
   const getTicketFilters = (inboxId?: string): TicketFilters => {
-    const f = activeView?.filters || {}
-    const result: TicketFilters = {}
-
-    // El inbox del filtro de la vista tiene precedencia sobre el seleccionado
-    if (f.inbox_id) result.inbox_id = f.inbox_id
-    else if (inboxId) result.inbox_id = inboxId
-
-    if (f.status && f.status.length > 0) result.status = f.status.join(',')
-    if (f.priority && f.priority.length > 0) result.priority = f.priority.join(',')
-    if (f.assignee) result.assigned_to = f.assignee
-    if (f.tag_id) result.tag_id = f.tag_id
-    if (f.read_status === 'read') result.is_read = true
-    if (f.read_status === 'unread') result.is_read = false
-    if (f.show_archived === 'only') result.archived = true
-    else if (f.show_archived === 'exclude' || f.show_archived === false) result.archived = false
-    if (f.show_snoozed === 'only') result.snoozed = 'only_snoozed'
-    else if (f.show_snoozed === 'exclude') result.snoozed = 'exclude_snoozed'
-
-    result.sort_order = activeView?.sort_order || 'desc'
-
-    return result
+    return buildTicketFilters(activeView, inboxId)
   }
 
   return {

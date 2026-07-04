@@ -44,7 +44,8 @@ async function proxyRequest(
       'Content-Type': 'application/json',
     }
 
-    const fetchOptions: RequestInit = { method, headers }
+    // no-store: evita que Next reutilice respuestas del API (datos siempre frescos)
+    const fetchOptions: RequestInit = { method, headers, cache: 'no-store' }
 
     if (method !== 'GET' && method !== 'DELETE') {
       const body = await request.json().catch(() => null)

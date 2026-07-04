@@ -3,7 +3,8 @@
 import * as React from 'react'
 import { Plus, Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useSplitInbox } from '@/hooks/use-split-inbox'
+import { useSplitInbox, buildTicketFilters } from '@/hooks/use-split-inbox'
+import { getTickets } from '@/lib/api-client'
 import { SplitInboxSettings } from './split-inbox-settings'
 
 interface SplitInboxTabsProps {
@@ -15,6 +16,37 @@ export function SplitInboxTabs({ onViewChange }: SplitInboxTabsProps) {
 
   const [settingsOpen, setSettingsOpen] = React.useState(false)
   const [settingsScreen, setSettingsScreen] = React.useState<'list' | 'create'>('list')
+  const [counts, setCounts] = React.useState<Record<string, number>>({})
+
+  // Contador de tickets por vista: pide limit=1 y usa pagination.total.
+  // Se refresca al cambiar las vistas/filtros o al seleccionar otra vista.
+  const viewsKey = JSON.stringify(visibleViews.map(v => [v.id, v.filters, v.sort_order]))
+  React.useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      const results = await Promise.all(
+        visibleViews.map(async (view) => {
+          try {
+            const res = await getTickets({ ...buildTicketFilters(view), limit: 1 })
+            return [view.id, res.pagination?.total ?? 0] as const
+          } catch {
+            return [view.id, -1] as const
+          }
+        })
+      )
+      if (cancelled) return
+      setCounts(prev => {
+        const next = { ...prev }
+        for (const [id, total] of results) {
+          if (total >= 0) next[id] = total
+        }
+        return next
+      })
+    }
+    load()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewsKey, activeViewId])
 
   const handleSelect = (viewId: string) => {
     setActiveViewId(viewId)
@@ -70,6 +102,11 @@ export function SplitInboxTabs({ onViewChange }: SplitInboxTabsProps) {
                 view.id === activeViewId ? 'bg-primary' : 'bg-muted-foreground/40'
               )} />
               <span className="truncate flex-1 text-left">{view.name}</span>
+              {counts[view.id] !== undefined && (
+                <span className="font-mono text-[10px] tabular-nums text-muted-foreground flex-shrink-0">
+                  {counts[view.id]}
+                </span>
+              )}
             </button>
           </li>
         ))}

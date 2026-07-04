@@ -1,5 +1,6 @@
 'use client'
 
+import * as React from 'react'
 import { X, Mail, MailOpen, Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import {
   Tooltip,
@@ -13,6 +14,7 @@ import {
   bulkUnarchive,
   bulkDelete,
 } from '@/lib/api-client'
+import { DeleteDialog } from './delete-dialog'
 
 interface BulkActionsBarProps {
   selectedIds: Set<string>
@@ -21,6 +23,9 @@ interface BulkActionsBarProps {
 }
 
 export function BulkActionsBar({ selectedIds, onClear, onComplete }: BulkActionsBarProps) {
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
+  const [isDeleting, setIsDeleting] = React.useState(false)
+
   if (selectedIds.size === 0) return null
 
   const ids = Array.from(selectedIds)
@@ -32,6 +37,20 @@ export function BulkActionsBar({ selectedIds, onClear, onComplete }: BulkActions
       onComplete()
     } catch (error) {
       console.error('Bulk action error:', error)
+    }
+  }
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    try {
+      await bulkDelete(ids)
+      setShowDeleteDialog(false)
+      onClear()
+      onComplete()
+    } catch (error) {
+      console.error('Bulk delete error:', error)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -99,7 +118,7 @@ export function BulkActionsBar({ selectedIds, onClear, onComplete }: BulkActions
         <TooltipTrigger asChild>
           <button
             className="h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-destructive/10 transition-colors"
-            onClick={() => handleAction(() => bulkDelete(ids))}
+            onClick={() => setShowDeleteDialog(true)}
           >
             <Trash2 className="h-3.5 w-3.5 text-destructive" />
           </button>
@@ -115,6 +134,15 @@ export function BulkActionsBar({ selectedIds, onClear, onComplete }: BulkActions
       >
         <X className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
+
+      {/* Confirmacion de borrado masivo */}
+      <DeleteDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        count={ids.length}
+        onConfirm={handleDelete}
+        isDeleting={isDeleting}
+      />
     </div>
   )
 }

@@ -282,6 +282,21 @@ export function ComposeDialog({ inboxes, onSent }: ComposeDialogProps) {
               />
             </div>
 
+            {/* Firma del inbox seleccionado (solo visual: el server la agrega al enviar) */}
+            {selectedInbox?.signature_html && (
+              <div className="px-4 pb-3 flex-shrink-0">
+                <div className="border-t border-border/50 pt-2.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Signature
+                  </span>
+                  <div
+                    className="mt-1.5 text-xs text-foreground [&_*]:max-w-full"
+                    dangerouslySetInnerHTML={{ __html: selectedInbox.signature_html }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Error */}
             {error && (
               <div className="mx-4 mb-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-1.5">

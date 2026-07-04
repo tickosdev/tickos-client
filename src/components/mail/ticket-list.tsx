@@ -155,7 +155,7 @@ export function TicketList({
               {/* Unread dot */}
               <div className="flex-shrink-0 pt-1.5 w-2">
                 {!ticket.is_read && (
-                  <span className="block h-2 w-2 rounded-full bg-primary" />
+                  <span className="block h-2 w-2 rounded-full bg-emerald-500" />
                 )}
               </div>
 

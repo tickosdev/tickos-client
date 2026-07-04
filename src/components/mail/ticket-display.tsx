@@ -551,14 +551,14 @@ export function TicketDisplay({ ticket, messages, isLoadingMessages, onTicketUpd
                   </span>
                 </div>
 
-                {/* Message body: caja blanca con borde interno (como produccion) */}
+                {/* Message body: caja con borde interno que sigue el theme (light/dark) */}
                 {message.body_html ? (
                   <div
-                    className="email-content-viewer rounded-md border border-black/10 text-xs p-2.5"
+                    className="email-content-viewer rounded-md border border-border text-xs p-2.5"
                     dangerouslySetInnerHTML={{ __html: message.body_html }}
                   />
                 ) : (
-                  <p className="rounded-md border border-black/10 bg-white text-neutral-800 text-xs whitespace-pre-wrap p-2.5">
+                  <p className="rounded-md border border-border bg-card text-card-foreground text-xs whitespace-pre-wrap p-2.5">
                     {message.body_text || ''}
                   </p>
                 )}
