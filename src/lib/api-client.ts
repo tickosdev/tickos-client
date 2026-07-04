@@ -1,94 +1,36 @@
 // =====================================================
 // TickOS API Client
 // =====================================================
-// Client for consuming TickOS API endpoints via proxy
+// Consume la API de TickOS via proxy local (/api/*)
+// El proxy agrega la API Key del servidor
 // =====================================================
 
-// Use local proxy to avoid CORS issues
-const API_BASE_URL = '/api'
+const API_BASE = '/api'
 
-interface ApiResponse<T> {
+// ---------------------------------------------------
+// Tipos base
+// ---------------------------------------------------
+
+export interface ApiResponse<T> {
   data: T
-  meta?: any
-  pagination?: any
-}
-
-class TickOSClient {
-  private apiKey: string
-  private baseUrl: string
-
-  constructor(apiKey: string, baseUrl: string = API_BASE_URL) {
-    this.apiKey = apiKey
-    this.baseUrl = baseUrl
-  }
-
-  private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    // Remove /api/v1 prefix since proxy adds it
-    const cleanEndpoint = endpoint.replace('/api/v1', '')
-    const url = `${this.baseUrl}${cleanEndpoint}`
-    
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    })
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-      throw new Error(error.error || `API Error: ${response.status}`)
-    }
-
-    return response.json()
-  }
-
-  // Accounts (Workspaces)
-  async getAccounts(): Promise<ApiResponse<Account[]>> {
-    return this.request('/accounts')
-  }
-
-  // Inboxes
-  async getInboxes(params?: { page?: number; limit?: number }): Promise<ApiResponse<Inbox[]>> {
-    const query = new URLSearchParams()
-    if (params?.page) query.set('page', params.page.toString())
-    if (params?.limit) query.set('limit', params.limit.toString())
-    
-    return this.request(`/inboxes${query.toString() ? `?${query}` : ''}`)
-  }
-
-  // Tickets
-  async getTickets(params?: TicketFilters): Promise<ApiResponse<Ticket[]>> {
-    const query = new URLSearchParams()
-    if (params?.status) query.set('status', params.status)
-    if (params?.priority) query.set('priority', params.priority)
-    if (params?.inbox_id) query.set('inbox_id', params.inbox_id)
-    if (params?.archived !== undefined) query.set('archived', params.archived.toString())
-    if (params?.is_read !== undefined) query.set('is_read', params.is_read.toString())
-    if (params?.limit) query.set('limit', params.limit.toString())
-    if (params?.offset) query.set('offset', params.offset.toString())
-    
-    return this.request(`/tickets${query.toString() ? `?${query}` : ''}`)
-  }
-
-  async getTicket(id: string): Promise<{ data: Ticket }> {
-    return this.request(`/tickets/${id}`)
-  }
-
-  async getTicketMessages(ticketId: string): Promise<ApiResponse<Message[]>> {
-    return this.request(`/tickets/${ticketId}/messages`)
-  }
-
-  // Ticket Management
-  async updateTicket(id: string, data: Partial<Ticket>): Promise<{ data: Ticket }> {
-    return this.request(`/tickets/${id}/manage`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
+  meta?: Record<string, unknown>
+  pagination?: {
+    total: number
+    limit: number
+    offset: number
+    has_more: boolean
   }
 }
 
-// Types
+export interface ApiError {
+  error: string
+  details?: string
+}
+
+// ---------------------------------------------------
+// Tipos de entidades
+// ---------------------------------------------------
+
 export interface Account {
   id: string
   name: string
@@ -123,6 +65,31 @@ export interface Inbox {
   is_active: boolean
 }
 
+export interface Customer {
+  id: string
+  account_id: string
+  name: string | null
+  email: string | null
+  phone: string | null
+  avatar_url: string | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerDetail extends Customer {
+  source?: string
+  is_blocked?: boolean
+  tickets: Array<{
+    id: string
+    client_id: string
+    subject: string
+    status: string
+    priority: string
+    created_at: string
+  }>
+}
+
 export interface Ticket {
   id: string
   account_id: string
@@ -130,11 +97,11 @@ export interface Ticket {
   customer_id: string
   assigned_to: string | null
   subject: string
-  status: 'open' | 'pending' | 'resolved' | 'closed'
+  status: 'open' | 'pending' | 'review' | 'resolved' | 'closed'
   priority: 'low' | 'normal' | 'medium' | 'high' | 'urgent'
   shared_uuid: string
   shared_expires_at: string | null
-  metadata: any
+  metadata: Record<string, unknown> | null
   created_at: string
   updated_at: string
   closed_at: string | null
@@ -162,6 +129,7 @@ export interface Ticket {
     name: string
     prefix: string
   }
+  tags?: Tag[]
 }
 
 export interface Message {
@@ -172,25 +140,352 @@ export interface Message {
   from_phone: string | null
   body_text: string | null
   body_html: string | null
-  direction: 'inbound' | 'outbound'
+  direction: 'inbound' | 'outbound' | 'internal'
   is_customer: boolean
   email_subject: string | null
   email_message_id: string | null
-  metadata: any
+  metadata: Record<string, unknown> | null
   created_at: string
   status: string
   is_read: boolean
+  message_files?: MessageFile[]
 }
+
+export interface MessageFile {
+  id: string
+  file_name: string
+  file_size: number
+  file_type: string
+  file_url: string
+  is_inline?: boolean
+  content_id?: string
+}
+
+export interface Tag {
+  id: string
+  name: string
+  color: string
+  account_id: string
+}
+
+export interface User {
+  id: string
+  email: string
+  full_name: string | null
+  avatar_url: string | null
+  role: string
+}
+
+export interface TicketStats {
+  total: number
+  open: number
+  pending: number
+  review: number
+  resolved: number
+  closed: number
+  unread: number
+  archived: number
+}
+
+export interface SplitInboxView {
+  id: string
+  name: string
+  filters: TicketFilters
+  position: number
+  account_id: string
+}
+
+// ---------------------------------------------------
+// Parametros de consulta
+// ---------------------------------------------------
 
 export interface TicketFilters {
   status?: string
   priority?: string
   inbox_id?: string
+  assigned_to?: string
+  tag_id?: string
   archived?: boolean
   is_read?: boolean
+  snoozed?: boolean
+  search?: string
+  sort_by?: 'created_at' | 'updated_at' | 'priority'
+  sort_order?: 'asc' | 'desc'
   limit?: number
   offset?: number
 }
 
-// Export singleton instance (no API key needed since proxy handles it)
-export const apiClient = new TickOSClient('', API_BASE_URL)
+export interface MessageFilters {
+  limit?: number
+  offset?: number
+}
+
+// ---------------------------------------------------
+// Request helpers
+// ---------------------------------------------------
+
+function buildQuery(params?: Record<string, unknown> | object): string {
+  if (!params) return ''
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      query.set(key, String(value))
+    }
+  }
+  const str = query.toString()
+  return str ? `?${str}` : ''
+}
+
+async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const url = `${API_BASE}${endpoint}`
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
+    throw new Error(error.error || error.message || `API Error: ${response.status}`)
+  }
+
+  if (response.status === 204) {
+    return {} as T
+  }
+
+  return response.json()
+}
+
+// ---------------------------------------------------
+// API: Accounts
+// ---------------------------------------------------
+
+export async function getAccounts(): Promise<ApiResponse<Account[]>> {
+  return request('/accounts')
+}
+
+// ---------------------------------------------------
+// API: Inboxes
+// ---------------------------------------------------
+
+export async function getInboxes(params?: { page?: number; limit?: number }): Promise<ApiResponse<Inbox[]>> {
+  return request(`/inboxes${buildQuery(params)}`)
+}
+
+// ---------------------------------------------------
+// API: Customers
+// ---------------------------------------------------
+
+export async function getCustomer(customerId: string): Promise<{ data: CustomerDetail }> {
+  return request(`/customers/${customerId}`)
+}
+
+// ---------------------------------------------------
+// API: Tickets
+// ---------------------------------------------------
+
+export async function getTickets(params?: TicketFilters): Promise<ApiResponse<Ticket[]>> {
+  return request(`/tickets${buildQuery(params)}`)
+}
+
+export async function getTicket(id: string): Promise<{ data: Ticket }> {
+  return request(`/tickets/${id}`)
+}
+
+// PATCH /tickets/[id] — actualizar campos directos (subject, description)
+export async function patchTicket(id: string, data: Partial<Pick<Ticket, 'subject'>>): Promise<{ data: Ticket }> {
+  return request(`/tickets/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+// PATCH /tickets/[id]/manage — operaciones de gestion con { action, data }
+export async function manageTicket(id: string, action: string, data?: Record<string, unknown>): Promise<{ data: Ticket }> {
+  return request(`/tickets/${id}/manage`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action, data }),
+  })
+}
+
+// Helpers sobre manageTicket
+export async function updateTicketStatus(id: string, status: Ticket['status']): Promise<{ data: Ticket }> {
+  return manageTicket(id, 'update_status', { status })
+}
+
+export async function updateTicketPriority(id: string, priority: Ticket['priority']): Promise<{ data: Ticket }> {
+  return manageTicket(id, 'update_priority', { priority })
+}
+
+export async function assignTicket(id: string, userId: string): Promise<{ data: Ticket }> {
+  return manageTicket(id, 'assign', { user_id: userId })
+}
+
+export async function unassignTicket(id: string): Promise<{ data: Ticket }> {
+  return manageTicket(id, 'unassign')
+}
+
+export async function markTicketRead(id: string): Promise<{ data: Ticket }> {
+  return manageTicket(id, 'mark_read')
+}
+
+export async function markTicketUnread(id: string): Promise<{ data: Ticket }> {
+  return manageTicket(id, 'mark_unread')
+}
+
+export async function archiveTicket(id: string): Promise<{ data: Ticket }> {
+  return manageTicket(id, 'archive')
+}
+
+export async function unarchiveTicket(id: string): Promise<{ data: Ticket }> {
+  return manageTicket(id, 'unarchive')
+}
+
+export async function deleteTicket(id: string): Promise<void> {
+  return request(`/tickets/${id}`, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------
+// API: Ticket Messages
+// ---------------------------------------------------
+
+export async function getTicketMessages(ticketId: string, params?: MessageFilters): Promise<ApiResponse<Message[]>> {
+  return request(`/tickets/${ticketId}/messages${buildQuery(params)}`)
+}
+
+export async function createReply(ticketId: string, data: {
+  body_html?: string
+  body_text?: string
+  direction?: 'outbound' | 'internal'
+}): Promise<{ data: Message }> {
+  return request(`/tickets/${ticketId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+// ---------------------------------------------------
+// API: Tags
+// ---------------------------------------------------
+
+export async function getTags(): Promise<ApiResponse<Tag[]>> {
+  return request('/tags')
+}
+
+export async function addTagToTicket(ticketId: string, tagId: string): Promise<void> {
+  return request(`/tickets/${ticketId}/tags`, {
+    method: 'POST',
+    body: JSON.stringify({ tag_id: tagId }),
+  })
+}
+
+export async function removeTagFromTicket(ticketId: string, tagId: string): Promise<void> {
+  return request(`/tickets/${ticketId}/tags/${tagId}`, {
+    method: 'DELETE',
+  })
+}
+
+// ---------------------------------------------------
+// API: Bulk Actions
+// ---------------------------------------------------
+
+export async function bulkMarkRead(ticketIds: string[]): Promise<void> {
+  return request('/tickets/bulk/mark-read', {
+    method: 'POST',
+    body: JSON.stringify({ ticket_ids: ticketIds }),
+  })
+}
+
+export async function bulkMarkUnread(ticketIds: string[]): Promise<void> {
+  return request('/tickets/bulk/mark-unread', {
+    method: 'POST',
+    body: JSON.stringify({ ticket_ids: ticketIds }),
+  })
+}
+
+export async function bulkArchive(ticketIds: string[]): Promise<void> {
+  return request('/tickets/bulk/archive', {
+    method: 'POST',
+    body: JSON.stringify({ ticket_ids: ticketIds }),
+  })
+}
+
+export async function bulkUnarchive(ticketIds: string[]): Promise<void> {
+  return request('/tickets/bulk/unarchive', {
+    method: 'POST',
+    body: JSON.stringify({ ticket_ids: ticketIds }),
+  })
+}
+
+export async function bulkSnooze(ticketIds: string[], until: string): Promise<void> {
+  return request('/tickets/bulk/snooze', {
+    method: 'POST',
+    body: JSON.stringify({ ticket_ids: ticketIds, snoozed_until: until }),
+  })
+}
+
+export async function bulkDelete(ticketIds: string[]): Promise<void> {
+  return request('/tickets/bulk/delete', {
+    method: 'POST',
+    body: JSON.stringify({ ticket_ids: ticketIds }),
+  })
+}
+
+// ---------------------------------------------------
+// API: Snooze
+// ---------------------------------------------------
+
+export async function snoozeTicket(ticketId: string, until: string): Promise<{ data: Ticket }> {
+  return manageTicket(ticketId, 'snooze', { until })
+}
+
+export async function unsnoozeTicket(ticketId: string): Promise<{ data: Ticket }> {
+  return manageTicket(ticketId, 'unsnooze')
+}
+
+// ---------------------------------------------------
+// API: Stats
+// ---------------------------------------------------
+
+export async function getTicketStats(): Promise<{ data: TicketStats }> {
+  return request('/tickets/stats')
+}
+
+// ---------------------------------------------------
+// API: Users (agentes)
+// ---------------------------------------------------
+
+export async function getUsers(): Promise<ApiResponse<User[]>> {
+  return request('/users')
+}
+
+// ---------------------------------------------------
+// API: Compose (crear ticket nuevo)
+// ---------------------------------------------------
+
+export async function composeEmail(data: {
+  inbox_id: string
+  to_email: string
+  cc?: string
+  bcc?: string
+  subject: string
+  body_text: string
+  body_html?: string
+  from_name?: string
+}): Promise<{ data: Ticket }> {
+  return request('/tickets/compose', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+// ---------------------------------------------------
+// API: Ticket Tags
+// ---------------------------------------------------
+
+export async function getTicketTags(ticketId: string): Promise<ApiResponse<Tag[]>> {
+  return request(`/tickets/${ticketId}/tags`)
+}

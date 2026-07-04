@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
 import { Inbox } from "@/lib/api-client"
 
 interface InboxBadgesProps {
@@ -33,9 +32,9 @@ export function InboxBadges({
           key={inbox.id}
           onClick={() => onSelectInbox(inbox)}
           className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors hover:bg-[#16a349] hover:text-white hover:border-[#16a349]",
+            "flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground hover:border-primary",
             selectedInbox?.id === inbox.id
-              ? "bg-[#16a349] text-white border-[#16a349]"
+              ? "bg-primary text-primary-foreground border-primary"
               : "bg-background text-foreground border-border"
           )}
           title={inbox.name}

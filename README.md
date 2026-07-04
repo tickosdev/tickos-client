@@ -1,156 +1,131 @@
 # TickOS Client Desk
 
-> **The Ticket Operating System for Developers**
+> The Ticket Operating System for Developers — Agent Inbox Client
 
-An open-source, beautiful mail client for managing your TickOS support tickets. Built with Next.js and powered entirely by the TickOS API.
+An open-source support ticket inbox for agents. Built with Next.js 15, powered entirely by the TickOS REST API.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/tickosdev/tickos-client-desk&env=TICKOS_USER_EMAIL,TICKOS_API_KEY&envDescription=TickOS%20API%20credentials%20required&envLink=https://app.tickos.dev/settings/api-keys)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/tickosdev/tickos-client-desk&env=TICKOS_API_KEY&envDescription=Your%20TickOS%20API%20Key&envLink=https://app.tickos.dev/app/api-keys)
 
-## ✨ Features
+## Features
 
-- 📧 **Email-Style Interface**: Familiar mail client design for managing tickets
-- 🎨 **Beautiful UI**: Built with Shadcn UI components
-- ⚡ **API-Powered**: 100% powered by TickOS REST API
-- 🔒 **Secure**: API key authentication only
-- 🚀 **One-Click Deploy**: Deploy to Vercel in seconds
-- 📱 **Responsive**: Optimized for desktop use
-- 🌙 **Dark Mode**: Full dark mode support
+- **Mail-style inbox** — Familiar three-panel layout for managing tickets
+- **Split inbox views** — Configurable filtered views (All, Inbox, Waiting, custom)
+- **Bulk actions** — Select multiple tickets for batch operations
+- **Compose email** — Create new tickets directly from the client
+- **Snooze** — Snooze tickets with quick picks or custom dates
+- **Reply and notes** — Reply to customers or leave internal notes
+- **Status and priority** — Inline dropdowns for quick ticket management
+- **Dark mode** — Full dark/light theme support
+- **API-first** — 100% driven by TickOS REST API, zero database
+- **One-click deploy** — Deploy to Vercel or Railway in seconds
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: Deploy to Vercel (Recommended)
 
-Click the button above to deploy your own instance to Vercel. You'll need:
-
-1. **Email**: Your TickOS account email
-2. **API Key**: Get it from [app.tickos.dev/settings/api-keys](https://app.tickos.dev/settings/api-keys)
+Click the deploy button above. You will need your TickOS API Key.
 
 ### Option 2: Local Development
 
-1. **Clone the repository**:
 ```bash
 git clone https://github.com/tickosdev/tickos-client-desk.git
 cd tickos-client-desk
-```
-
-2. **Install dependencies**:
-```bash
 npm install
-```
-
-3. **Configure environment variables**:
-```bash
 cp .env.example .env.local
 ```
 
-Edit `.env.local`:
+Edit `.env.local` with your API key:
+
 ```env
-TICKOS_USER_EMAIL=your@email.com
 TICKOS_API_KEY=sk_your_api_key_here
 ```
 
-4. **Run the development server**:
+Start the dev server:
+
 ```bash
 npm run dev
 ```
 
-5. **Open [http://localhost:3000](http://localhost:3000)**
+Open [http://localhost:3000](http://localhost:3000).
 
-## 🎯 Requirements
+### Option 3: Setup via UI
 
-- **TickOS Account**: Sign up at [tickos.dev](https://tickos.dev)
-- **API Key**: Generate from your TickOS dashboard
-- **Node.js**: Version 18.0 or higher
+If you don't set `TICKOS_API_KEY` in your environment, the app will redirect to `/setup` where you can paste your API key through the browser. The key is stored in an HTTP-only cookie.
 
-## 🛠️ Tech Stack
+## Requirements
 
-- **Framework**: [Next.js 15](https://nextjs.org/) with App Router
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **UI Components**: [Shadcn UI](https://ui.shadcn.com/)
-- **State Management**: [Jotai](https://jotai.org/)
-- **Icons**: [Lucide React](https://lucide.dev/)
-- **Deployment**: [Vercel](https://vercel.com/)
+- **TickOS Account** — Sign up at [tickos.dev](https://tickos.dev)
+- **API Key** — Generate from Settings > API Keys in your TickOS dashboard
+- **Node.js** — Version 18.0 or higher
 
-## 🏗️ Project Structure
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| UI Components | Shadcn UI + Radix UI |
+| State | Jotai |
+| Icons | Lucide React |
+| Fonts | Geist Sans + Geist Mono |
+
+## Project Structure
 
 ```
-tickos-client-desk/
-├── src/
-│   ├── app/              # Next.js app router pages
-│   ├── components/       # React components
-│   │   └── ui/          # Shadcn UI components
-│   ├── lib/             # Utility functions
-│   └── hooks/           # Custom React hooks
-├── public/              # Static assets
-└── ...config files
+src/
+├── app/              # Pages and API routes
+│   ├── api/          # Proxy to TickOS API
+│   └── setup/        # API key configuration page
+├── components/
+│   ├── mail/         # Inbox components (ticket list, display, compose, etc.)
+│   └── ui/           # Shadcn UI primitives
+├── hooks/            # Custom hooks (split inbox, etc.)
+└── lib/              # API client, store, utilities
 ```
 
-## 🎨 Design System
+## Available Scripts
 
-- **Primary Color**: `#16a349` (TickOS Green)
-- **Theme**: Light & Dark mode support
-- **Icons**: React Icons (Lucide)
-- **No Emojis**: Professional, clean design
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm start` | Start production server |
+| `npm run lint` | ESLint |
+| `npm run type-check` | TypeScript checking |
 
-## 📚 Available Scripts
+## How It Works
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run type-check` - Check TypeScript types
+The client communicates with the TickOS API through a local proxy (`/api/[...path]`). The proxy injects the API key server-side so credentials never reach the browser.
 
-## 🌐 Architecture
-
-This project follows a multi-domain architecture:
-
-- `tickos.dev` - Marketing landing page
-- `app.tickos.dev` - Dashboard application
-- `api.tickos.dev` - REST API
-
-All managed from a single Next.js codebase with Vercel routing.
-
-## 🔑 API Integration
-
-The client includes a built-in TickOS API client:
-
-```typescript
-import { createTickOSClient } from '@/lib/tickos-client'
-
-const client = createTickOSClient('your_api_key')
-
-// Get tickets
-const tickets = await client.getTickets()
-
-// Create ticket
-const ticket = await client.createTicket({
-  subject: 'Help needed',
-  customer_email: 'user@example.com',
-  message: 'I need help with...',
-  inbox_id: 'inb_xxx'
-})
+```
+Browser → /api/tickets → Proxy → api.tickos.dev/api/v1/tickets
 ```
 
-## 📖 Documentation
+All ticket operations (CRUD, status changes, replies, bulk actions) go through this proxy.
 
-Visit [docs.tickos.dev](https://docs.tickos.dev) for full documentation.
+## API Coverage
 
-## 🤝 Contributing
+The client covers these TickOS API v1 endpoints:
 
-We welcome contributions! Please see our contributing guidelines.
+- **Accounts** — List workspaces
+- **Inboxes** — List inboxes
+- **Tickets** — List, get, create, update status/priority, assign, archive, snooze, delete
+- **Messages** — List messages, create replies and internal notes
+- **Tags** — List, add/remove from tickets
+- **Bulk** — Mark read/unread, archive/unarchive, delete
+- **Users** — List agents for assignment
+- **Compose** — Create new outbound tickets
+- **Stats** — Ticket statistics
 
-## 📄 License
+## Contributing
 
-MIT License - see LICENSE file for details.
+Contributions are welcome. Please open an issue first to discuss what you would like to change.
 
-## 🔗 Links
+## License
 
-- [Website](https://tickos.dev)
-- [Documentation](https://docs.tickos.dev)
-- [API Reference](https://api.tickos.dev/docs)
-- [GitHub](https://github.com/tickosdev)
+MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-Built with ❤️ by the TickOS team
+Built by the TickOS team.

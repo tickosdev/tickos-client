@@ -23,9 +23,13 @@ const config: Config = {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         primary: {
-          DEFAULT: '#16a349',
+          DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
-          hover: '#138f3e',
+          hover: 'hsl(var(--primary-hover))',
+        },
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))',
         },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
@@ -60,12 +64,6 @@ const config: Config = {
           'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
-        },
-        // TickOS Brand Colors
-        tickos: {
-          green: '#16a349',
-          'green-hover': '#138f3e',
-          'green-light': '#e6f7ee',
         },
       },
       borderRadius: {

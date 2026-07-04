@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { HiMoon, HiSun } from "react-icons/hi"
+import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,9 +32,9 @@ export function ThemeToggle() {
           className="h-9 w-9"
         >
           {theme === "dark" ? (
-            <HiSun className="h-5 w-5" />
+            <Sun className="h-4 w-4" />
           ) : (
-            <HiMoon className="h-5 w-5" />
+            <Moon className="h-4 w-4" />
           )}
           <span className="sr-only">Toggle theme</span>
         </Button>

@@ -1,13 +1,55 @@
 'use client'
 
+import * as React from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Loader2 } from 'lucide-react'
 
 export default function SetupPage() {
   const { theme } = useTheme()
+  const router = useRouter()
+  const [email, setEmail] = React.useState('')
+  const [apiKey, setApiKey] = React.useState('')
+  const [isLoading, setIsLoading] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, apiKey }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to save configuration')
+        return
+      }
+
+      // Redirigir al inbox
+      router.push('/')
+      router.refresh()
+    } catch {
+      setError('Connection error. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -15,77 +57,103 @@ export default function SetupPage() {
         {/* Logo */}
         <div className="flex flex-col items-center space-y-4">
           <div className="relative w-10 h-10">
-            <Image
-              src={theme === 'dark' ? '/dark.png' : '/ligth.png'}
-              alt="TickOS"
-              fill
-              className="object-contain"
-              priority
-            />
+            {mounted && (
+              <Image
+                src={theme === 'dark' ? '/dark.png' : '/ligth.png'}
+                alt="TickOS"
+                fill
+                className="object-contain"
+                priority
+              />
+            )}
           </div>
-          <h1 className="text-xl font-medium tracking-tight">Configure TickOS Client</h1>
+          <div className="text-center space-y-1">
+            <h1 className="text-lg font-medium tracking-tight">TickOS Client</h1>
+            <p className="text-xs text-muted-foreground font-mono">Configure your API connection</p>
+          </div>
         </div>
 
         {/* Form */}
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-normal">
+            <Label htmlFor="email" className="text-xs font-normal">
               Email Address
             </Label>
             <Input
               id="email"
               type="email"
               placeholder="you@example.com"
-              className="h-10 text-sm"
+              className="h-9 text-xs"
               required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground">
               Your TickOS account email
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="apikey" className="text-sm font-normal">
+            <Label htmlFor="apikey" className="text-xs font-normal">
               API Key
             </Label>
             <Input
               id="apikey"
               type="password"
               placeholder="sk_..."
-              className="h-10 text-sm"
+              className="h-9 text-xs font-mono"
               required
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              disabled={isLoading}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground">
               Get your API key from{' '}
-              <a 
-                href="https://app.tickos.dev/settings/api-keys" 
+              <a
+                href="https://app.tickos.dev/app/api-keys"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-tickos-green hover:underline"
+                className="text-primary hover:underline"
               >
                 app.tickos.dev
               </a>
             </p>
           </div>
 
-          <Button 
-            className="w-full h-10 bg-tickos-green hover:bg-tickos-green-hover text-sm font-normal"
+          {/* Error */}
+          {error && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+              <p className="text-xs text-destructive">{error}</p>
+            </div>
+          )}
+
+          <Button
+            className="w-full h-9 text-xs"
             type="submit"
+            disabled={isLoading || !email || !apiKey}
           >
-            Save Configuration
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                Validating...
+              </>
+            ) : (
+              'Save Configuration'
+            )}
           </Button>
 
-          {/* Note */}
+          {/* Alternativa: env vars */}
           <div className="pt-4 border-t border-border/50">
-            <p className="text-xs text-center text-muted-foreground mb-2">
-              <strong>Note:</strong> Add these values to your <code className="bg-muted px-1 py-0.5 rounded">.env.local</code> file:
+            <p className="text-[10px] text-center text-muted-foreground mb-2">
+              Or set environment variables in <code className="bg-muted px-1 py-0.5 rounded font-mono">.env.local</code>
             </p>
-            <pre className="p-2 bg-muted rounded text-[11px] leading-relaxed">
-{`TICKOS_USER_EMAIL=your@email.com
-TICKOS_API_KEY=sk_your_key`}
+            <pre className="p-2 bg-muted rounded font-mono text-[10px] leading-relaxed text-muted-foreground">
+{`TICKOS_API_KEY=sk_your_key
+NEXT_PUBLIC_API_URL=https://api.tickos.dev`}
             </pre>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   )

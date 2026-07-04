@@ -1,16 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { HiOutlineChevronDown } from "react-icons/hi"
+import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Account } from "@/lib/api-client"
 
 interface WorkspaceSwitcherProps {
@@ -33,61 +31,40 @@ export function WorkspaceSwitcher({
   accounts,
   selectedAccount,
   onSelectAccount,
-  isCollapsed = false,
 }: WorkspaceSwitcherProps) {
   return (
-    <Select
-      value={selectedAccount?.id || ''}
-      onValueChange={(value) => {
-        const account = accounts.find((acc) => acc.id === value)
-        if (account) onSelectAccount(account)
-      }}
-    >
-      <SelectTrigger
-        className={cn(
-          "border-0 bg-transparent hover:bg-accent",
-          isCollapsed 
-            ? "h-10 w-10 p-0 items-center justify-center [&>span]:w-auto"
-            : "h-7 px-1.5 gap-1.5 text-[13px] font-normal"
-        )}
-        aria-label="Select workspace"
-      >
-        <SelectValue placeholder="W">
-          {isCollapsed ? (
-            <Avatar className="h-4 w-4 rounded-[4px]">
-              <AvatarFallback className="text-[9px] bg-[#16a349] text-white rounded-[4px] font-medium">
-                {selectedAccount ? getInitials(selectedAccount.name) : 'W'}
-              </AvatarFallback>
-            </Avatar>
-          ) : (
-            <div className="flex items-center gap-1.5">
-              <Avatar className="h-4 w-4 rounded-[4px]">
-                <AvatarFallback className="text-[9px] bg-[#16a349] text-white rounded-[4px] font-medium">
-                  {selectedAccount ? getInitials(selectedAccount.name) : 'W'}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden sm:inline">
-                {selectedAccount?.name || 'Loading...'}
-              </span>
-              <HiOutlineChevronDown className="h-3 w-3 text-muted-foreground" />
-            </div>
-          )}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent align="start" className="w-[280px]">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-accent transition-colors outline-none w-full">
+          <div className="h-7 w-7 flex items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-[10px] flex-shrink-0">
+            {selectedAccount ? getInitials(selectedAccount.name) : 'W'}
+          </div>
+          <span className="text-xs font-medium truncate flex-1 text-left">
+            {selectedAccount?.name || 'Workspace'}
+          </span>
+          <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-[240px]">
         {accounts.map((account) => (
-          <SelectItem key={account.id} value={account.id}>
-            <div className="flex items-center gap-3">
-              <Avatar className="h-4 w-4 rounded-[4px]">
-                <AvatarFallback className="text-[9px] bg-[#16a349] text-white rounded-[4px] font-medium">
-                  {getInitials(account.name)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm">{account.name}</span>
+          <DropdownMenuItem
+            key={account.id}
+            onClick={() => onSelectAccount(account)}
+            className={cn(
+              "gap-3 cursor-pointer",
+              selectedAccount?.id === account.id && "bg-accent"
+            )}
+          >
+            <div className="h-7 w-7 flex items-center justify-center rounded-md bg-primary text-primary-foreground font-semibold text-[10px] flex-shrink-0">
+              {getInitials(account.name)}
             </div>
-          </SelectItem>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-medium truncate">{account.name}</span>
+              <span className="text-[10px] text-muted-foreground font-mono">{account.slug}</span>
+            </div>
+          </DropdownMenuItem>
         ))}
-      </SelectContent>
-    </Select>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

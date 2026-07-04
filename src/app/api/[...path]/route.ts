@@ -1,123 +1,109 @@
-// =====================================================
-// API Proxy Route for TickOS Client
-// =====================================================
-// Proxy all requests to avoid CORS issues
-// =====================================================
-
 import { NextRequest, NextResponse } from 'next/server'
 
-const TICKOS_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-const API_KEY = process.env.TICKOS_API_KEY || ''
+const TICKOS_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tickos.dev'
 
-export async function GET(
+function getApiKey(request: NextRequest): string {
+  // Prioridad: env var > cookie
+  return process.env.TICKOS_API_KEY || request.cookies.get('tickos_api_key')?.value || ''
+}
+
+async function proxyRequest(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  params: Promise<{ path: string[] }>,
+  method: string
 ) {
   try {
+    const apiKey = getApiKey(request)
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'API key not configured. Go to /setup to configure.' },
+        { status: 401 }
+      )
+    }
+
     const { path: pathArray } = await params
     const path = pathArray.join('/')
     const searchParams = request.nextUrl.searchParams
     const queryString = searchParams.toString()
-    
+
     const url = `${TICKOS_API_URL}/api/v1/${path}${queryString ? `?${queryString}` : ''}`
-    
-    console.log('🔵 [API Proxy] GET:', url)
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': API_KEY,
-        'Content-Type': 'application/json',
-      },
-    })
+
+    const headers: Record<string, string> = {
+      'Authorization': apiKey,
+      'Content-Type': 'application/json',
+    }
+
+    const fetchOptions: RequestInit = { method, headers }
+
+    if (method !== 'GET' && method !== 'DELETE') {
+      const body = await request.json().catch(() => null)
+      if (body) {
+        fetchOptions.body = JSON.stringify(body)
+      }
+    }
+
+    console.log(`[Proxy] ${method} ${url}`)
+
+    const response = await fetch(url, fetchOptions)
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-      return NextResponse.json(error, { status: response.status })
+      const errorText = await response.text()
+      console.error(`[Proxy] ${method} ${url} -> ${response.status}:`, errorText)
+      try {
+        const errorJson = JSON.parse(errorText)
+        return NextResponse.json(errorJson, { status: response.status })
+      } catch {
+        return NextResponse.json({ error: errorText || 'Unknown error' }, { status: response.status })
+      }
+    }
+
+    if (response.status === 204) {
+      return new NextResponse(null, { status: 204 })
     }
 
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('❌ [API Proxy] Error:', error)
+    console.error(`[Proxy] ${method} error:`, error)
     return NextResponse.json(
-      { error: 'Failed to fetch from TickOS API' },
+      { error: 'Failed to proxy request to TickOS API' },
       { status: 500 }
     )
   }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return proxyRequest(request, params, 'GET')
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  try {
-    const { path: pathArray } = await params
-    const path = pathArray.join('/')
-    const body = await request.json()
-    
-    const url = `${TICKOS_API_URL}/api/v1/${path}`
-    
-    console.log('🔵 [API Proxy] POST:', url)
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-      return NextResponse.json(error, { status: response.status })
-    }
-
-    const data = await response.json()
-    return NextResponse.json(data)
-  } catch (error) {
-    console.error('❌ [API Proxy] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to post to TickOS API' },
-      { status: 500 }
-    )
-  }
+  return proxyRequest(request, params, 'POST')
 }
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  try {
-    const { path: pathArray } = await params
-    const path = pathArray.join('/')
-    const body = await request.json()
-    
-    const url = `${TICKOS_API_URL}/api/v1/${path}`
-    
-    console.log('🔵 [API Proxy] PUT:', url)
-    
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
+  return proxyRequest(request, params, 'PUT')
+}
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-      return NextResponse.json(error, { status: response.status })
-    }
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return proxyRequest(request, params, 'PATCH')
+}
 
-    const data = await response.json()
-    return NextResponse.json(data)
-  } catch (error) {
-    console.error('❌ [API Proxy] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to update via TickOS API' },
-      { status: 500 }
-    )
-  }
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return proxyRequest(request, params, 'DELETE')
 }

@@ -19,40 +19,39 @@ function getInitials(name: string) {
     .slice(0, 2)
 }
 
-interface InboxListWithToggleProps extends InboxListProps {
-  themeToggle?: React.ReactNode
-}
-
-export function InboxList({ inboxes, selectedInbox, onSelectInbox, themeToggle }: InboxListWithToggleProps) {
+export function InboxList({ inboxes, selectedInbox, onSelectInbox }: InboxListProps) {
   return (
-    <div className="flex h-full flex-col items-center">
-      <div className="flex-1 overflow-auto py-2">
-        <ul className="flex flex-col gap-2 items-center">
-          {inboxes.map((inbox) => (
-            <li key={inbox.id}>
-              <button
-                onClick={() => onSelectInbox(inbox)}
+    <div className="py-2 px-2">
+      <span className="px-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+        Inboxes
+      </span>
+      <ul className="flex flex-col gap-0.5 mt-1.5">
+        {inboxes.map((inbox) => (
+          <li key={inbox.id}>
+            <button
+              onClick={() => onSelectInbox(inbox)}
+              className={cn(
+                "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors",
+                selectedInbox?.id === inbox.id
+                  ? "bg-accent text-foreground font-medium"
+                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              )}
+            >
+              <span
                 className={cn(
-                  "h-4 w-4 flex items-center justify-center rounded-[4px] font-medium text-[9px] transition-colors",
+                  "h-5 w-5 flex items-center justify-center rounded text-[9px] font-semibold flex-shrink-0",
                   selectedInbox?.id === inbox.id
-                    ? "bg-[#16a349] text-white"
-                    : "bg-muted text-foreground hover:bg-accent"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/60 text-muted-foreground"
                 )}
-                title={inbox.name}
               >
                 {getInitials(inbox.name)}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-      {themeToggle && (
-        <div className="mt-auto border-t p-2">
-          <div className="flex items-center justify-center">
-            {themeToggle}
-          </div>
-        </div>
-      )}
+              </span>
+              <span className="truncate">{inbox.name}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
