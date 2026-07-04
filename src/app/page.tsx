@@ -1,20 +1,13 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { TickosClient } from '@/components/mail/tickos-client'
+import { getWorkspaces } from '@/lib/workspaces'
 
 export default async function HomePage() {
-  const cookieStore = await cookies()
-
-  // API key: env var o cookie (configurada desde /setup)
-  const apiKey = process.env.TICKOS_API_KEY || cookieStore.get('tickos_api_key')?.value
-
-  if (!apiKey) {
-    redirect('/setup')
+  // Si no hay workspaces configurados, redirigir a login/setup
+  const workspaces = getWorkspaces()
+  if (workspaces.length === 0) {
+    redirect('/login')
   }
-
-  // Layout preferences
-  const layout = cookieStore.get('react-resizable-panels:layout:tickos')
-  const defaultLayout = layout ? JSON.parse(layout.value) : undefined
 
   return (
     <>
@@ -26,7 +19,7 @@ export default async function HomePage() {
         </div>
       </div>
       <div className="hidden h-screen flex-col md:flex">
-        <TickosClient defaultLayout={defaultLayout} />
+        <TickosClient />
       </div>
     </>
   )

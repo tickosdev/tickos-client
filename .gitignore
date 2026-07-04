@@ -29,6 +29,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# workspace config (contains API keys)
+/data/workspaces.json
+
 # vercel
 .vercel
 

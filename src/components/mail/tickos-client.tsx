@@ -3,14 +3,9 @@
 import * as React from "react"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable"
 import { Separator } from "@/components/ui/separator"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { WorkspaceSwitcher } from "./workspace-switcher"
+import { WorkspaceSwitcher, type ConfiguredWorkspace } from "./workspace-switcher"
 import { InboxList } from "./inbox-list"
 import { TicketDisplay } from "./ticket-display"
 import { TicketList } from "./ticket-list"
@@ -18,36 +13,27 @@ import { BulkActionsBar } from "./bulk-actions-bar"
 import { ComposeDialog } from "./compose-dialog"
 import { SplitInboxTabs } from "./split-inbox-tabs"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { SettingsDialog } from "./settings-dialog"
 import {
-  Account,
   Inbox as InboxType,
   Message,
-  getAccounts,
   getInboxes,
   getTickets,
+  getTicket,
   getTicketMessages,
+  markTicketRead,
 } from "@/lib/api-client"
 import { useAtom } from "jotai"
 import {
-  selectedAccountAtom,
   selectedInboxAtom,
   selectedTicketIdAtom,
   ticketsAtom,
   inboxesAtom,
-  accountsAtom,
 } from "@/lib/store"
 import { useSplitInbox } from "@/hooks/use-split-inbox"
 
-interface TickosClientProps {
-  defaultLayout?: number[] | undefined
-}
-
-export function TickosClient({
-  defaultLayout = [32, 48],
-}: TickosClientProps) {
+export function TickosClient() {
   // Global state
-  const [accounts, setAccounts] = useAtom(accountsAtom)
-  const [selectedAccount, setSelectedAccount] = useAtom(selectedAccountAtom)
   const [inboxes, setInboxes] = useAtom(inboxesAtom)
   const [selectedInbox, setSelectedInbox] = useAtom(selectedInboxAtom)
   const [tickets, setTickets] = useAtom(ticketsAtom)
@@ -60,6 +46,19 @@ export function TickosClient({
   const [messages, setMessages] = React.useState<Message[]>([])
   const [searchQuery, setSearchQuery] = React.useState('')
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
+
+  // Loading states (para skeletons)
+  const [isLoadingInboxes, setIsLoadingInboxes] = React.useState(false)
+  const [isLoadingTickets, setIsLoadingTickets] = React.useState(false)
+  const [isLoadingMessages, setIsLoadingMessages] = React.useState(false)
+
+  // Paginacion (scroll infinito)
+  const [hasMoreTickets, setHasMoreTickets] = React.useState(false)
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false)
+
+  // Workspace state
+  const [workspaces, setWorkspaces] = React.useState<ConfiguredWorkspace[]>([])
+  const [activeWorkspace, setActiveWorkspace] = React.useState<string | null>(null)
 
   // Keyboard shortcuts (J/K navigation)
   React.useEffect(() => {
@@ -83,19 +82,19 @@ export function TickosClient({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [tickets, selectedTicketId, setSelectedTicketId])
 
-  // Load accounts on mount
+  // Load configured workspaces on mount
   React.useEffect(() => {
-    loadAccounts()
+    loadWorkspaces()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Load inboxes when account changes
+  // Load inboxes when active workspace changes
   React.useEffect(() => {
-    if (selectedAccount) {
+    if (activeWorkspace) {
       loadInboxes()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccount])
+  }, [activeWorkspace])
 
   // Load tickets when inbox or active view changes
   React.useEffect(() => {
@@ -113,21 +112,60 @@ export function TickosClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTicketId])
 
-  const loadAccounts = async () => {
-    try {
-      const response = await getAccounts()
-      setAccounts(response.data)
+  // Marcar como leido al abrir un ticket (apaga el punto azul de no leido)
+  React.useEffect(() => {
+    if (!selectedTicketId) return
+    const ticket = tickets.find(t => t.id === selectedTicketId)
+    if (ticket && !ticket.is_read) {
+      markTicketRead(selectedTicketId).catch(err =>
+        console.error('Error marking ticket as read:', err)
+      )
+      setTickets(prev =>
+        prev.map(t => (t.id === selectedTicketId ? { ...t, is_read: true } : t))
+      )
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTicketId])
 
-      const currentAccount = response.data.find(acc => acc.is_current) || response.data[0]
-      if (currentAccount) {
-        setSelectedAccount(currentAccount)
+  const loadWorkspaces = async () => {
+    try {
+      const res = await fetch('/api/auth/workspaces/config')
+      if (res.ok) {
+        const data = await res.json()
+        const wsList: ConfiguredWorkspace[] = (data.data || []).map((w: { name: string }) => ({
+          name: w.name,
+        }))
+        setWorkspaces(wsList)
+
+        // Seleccionar el primero si no hay activo
+        if (wsList.length > 0 && !activeWorkspace) {
+          setActiveWorkspace(wsList[0].name)
+        }
       }
     } catch (error) {
-      console.error('Error loading accounts:', error)
+      console.error('Error loading workspaces:', error)
+    }
+  }
+
+  const handleSwitchWorkspace = async (name: string) => {
+    try {
+      await fetch('/api/auth/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      setActiveWorkspace(name)
+      setSelectedInbox(null)
+      setTickets([])
+      setSelectedTicketId(null)
+      setInboxes([])
+    } catch (error) {
+      console.error('Error switching workspace:', error)
     }
   }
 
   const loadInboxes = async () => {
+    setIsLoadingInboxes(true)
     try {
       const response = await getInboxes({ limit: 100 })
       setInboxes(response.data)
@@ -137,12 +175,15 @@ export function TickosClient({
       }
     } catch (error) {
       console.error('Error loading inboxes:', error)
+    } finally {
+      setIsLoadingInboxes(false)
     }
   }
 
   const loadTickets = async () => {
     if (!selectedInbox) return
 
+    setIsLoadingTickets(true)
     try {
       const filters = getTicketFilters(selectedInbox.id)
       const response = await getTickets({
@@ -151,26 +192,77 @@ export function TickosClient({
         limit: 50,
       })
       setTickets(response.data)
+      // Fallback: si el server no reporta total, asumir que hay mas si vino la pagina llena
+      const total = response.pagination?.total ?? 0
+      setHasMoreTickets(total > 0 ? response.data.length < total : response.data.length === 50)
     } catch (error) {
       console.error('Error loading tickets:', error)
       setTickets([])
+      setHasMoreTickets(false)
+    } finally {
+      setIsLoadingTickets(false)
     }
   }
 
-  const loadMessages = async (ticketId: string) => {
+  // Scroll infinito: cargar la siguiente pagina y anexarla a la lista
+  const loadMoreTickets = async () => {
+    if (!selectedInbox || isLoadingMore || isLoadingTickets || !hasMoreTickets) return
+
+    setIsLoadingMore(true)
+    try {
+      const filters = getTicketFilters(selectedInbox.id)
+      const offset = tickets.length
+      const response = await getTickets({
+        ...filters,
+        search: searchQuery || undefined,
+        limit: 50,
+        offset,
+      })
+      setTickets(prev => {
+        // Evitar duplicados si el servidor repite algun ticket
+        const existing = new Set(prev.map(t => t.id))
+        return [...prev, ...response.data.filter(t => !existing.has(t.id))]
+      })
+      const total = response.pagination?.total ?? 0
+      setHasMoreTickets(total > 0 ? offset + response.data.length < total : response.data.length === 50)
+    } catch (error) {
+      console.error('Error loading more tickets:', error)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
+
+  // Abrir un ticket desde el panel de contacto: si no esta en la lista
+  // actual, lo trae de la API y lo agrega para poder mostrarlo
+  const handleOpenTicket = async (ticketId: string) => {
+    if (!tickets.some(t => t.id === ticketId)) {
+      try {
+        const response = await getTicket(ticketId)
+        if (response.data) {
+          setTickets(prev => [response.data, ...prev])
+        }
+      } catch (error) {
+        console.error('Error loading ticket:', error)
+        return
+      }
+    }
+    setSelectedTicketId(ticketId)
+  }
+
+  // silent: refresca sin vaciar el hilo ni mostrar skeleton (ej. tras enviar una respuesta)
+  const loadMessages = async (ticketId: string, opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setIsLoadingMessages(true)
+      setMessages([])
+    }
     try {
       const response = await getTicketMessages(ticketId)
       setMessages(response.data)
     } catch (error) {
       console.error('Error loading messages:', error)
+    } finally {
+      if (!opts?.silent) setIsLoadingMessages(false)
     }
-  }
-
-  const handleSelectAccount = (account: Account) => {
-    setSelectedAccount(account)
-    setSelectedInbox(null)
-    setTickets([])
-    setSelectedTicketId(null)
   }
 
   const handleSelectInbox = (inbox: InboxType) => {
@@ -205,9 +297,9 @@ export function TickosClient({
         <div className="w-[180px] flex-shrink-0 border-r flex flex-col">
           <div className="flex h-[52px] items-center px-3">
             <WorkspaceSwitcher
-              accounts={accounts}
-              selectedAccount={selectedAccount}
-              onSelectAccount={handleSelectAccount}
+              workspaces={workspaces}
+              activeWorkspace={activeWorkspace}
+              onSwitch={handleSwitchWorkspace}
             />
           </div>
           <Separator />
@@ -216,25 +308,21 @@ export function TickosClient({
               inboxes={inboxes}
               selectedInbox={selectedInbox}
               onSelectInbox={handleSelectInbox}
+              isLoading={isLoadingInboxes}
             />
             <Separator className="mx-2" />
             <SplitInboxTabs onViewChange={loadTickets} />
           </div>
-          <div className="border-t py-2 flex items-center justify-center">
+          <div className="border-t py-2 flex items-center justify-center gap-1">
             <ThemeToggle />
+            <SettingsDialog onWorkspacesChange={loadWorkspaces} />
           </div>
         </div>
 
-        {/* Main content area - resizable ticket list + ticket display */}
-        <ResizablePanelGroup
-          direction="horizontal"
-          onLayout={(sizes: number[]) => {
-            document.cookie = `react-resizable-panels:layout:tickos=${JSON.stringify(sizes)}`
-          }}
-          className="flex-1"
-        >
-          {/* Middle Panel - Ticket List */}
-          <ResizablePanel defaultSize={defaultLayout[0]} minSize={28} className="relative flex flex-col">
+        {/* Main content area - listado de ancho fijo + ticket display flexible */}
+        <div className="flex flex-1 min-w-0">
+          {/* Middle Panel - Ticket List (ancho fijo: nunca se corta la info) */}
+          <div className="relative flex flex-col w-[480px] flex-shrink-0 border-r">
             {/* Header */}
             <div className="flex items-center justify-between px-4 h-[52px] flex-shrink-0">
               <div className="flex items-baseline gap-2">
@@ -271,6 +359,10 @@ export function TickosClient({
                 onSelectTicket={setSelectedTicketId}
                 selectedIds={selectedIds}
                 onToggleSelect={handleToggleSelect}
+                isLoading={isLoadingTickets}
+                hasMore={hasMoreTickets}
+                isLoadingMore={isLoadingMore}
+                onLoadMore={loadMoreTickets}
               />
             </div>
 
@@ -279,19 +371,25 @@ export function TickosClient({
               onClear={() => setSelectedIds(new Set())}
               onComplete={loadTickets}
             />
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
+          </div>
 
           {/* Right Panel - Ticket Display */}
-          <ResizablePanel defaultSize={defaultLayout[1]} minSize={30}>
+          <div className="flex-1 min-w-0">
             <TicketDisplay
               ticket={selectedTicket}
               messages={messages}
+              isLoadingMessages={isLoadingMessages}
               onTicketUpdate={loadTickets}
+              onMessageSent={() => {
+                if (selectedTicketId) loadMessages(selectedTicketId, { silent: true })
+              }}
+              onOpenTicket={handleOpenTicket}
+              onRefreshMessages={async () => {
+                if (selectedTicketId) await loadMessages(selectedTicketId, { silent: true })
+              }}
             />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+        </div>
       </div>
     </TooltipProvider>
   )

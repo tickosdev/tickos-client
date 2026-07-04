@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getWorkspaces } from '@/lib/workspaces'
 
-const TICKOS_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.tickos.dev'
+function getActiveWorkspace(request: NextRequest) {
+  const workspaces = getWorkspaces()
+  if (workspaces.length === 0) return null
 
-function getApiKey(request: NextRequest): string {
-  // Prioridad: env var > cookie
-  return process.env.TICKOS_API_KEY || request.cookies.get('tickos_api_key')?.value || ''
+  // Leer workspace activo de cookie (si hay multi-workspace)
+  const activeWorkspaceName = request.cookies.get('tickos-active-workspace')?.value
+
+  if (activeWorkspaceName) {
+    const found = workspaces.find(w => w.name === activeWorkspaceName)
+    if (found) return found
+  }
+
+  // Default: primer workspace
+  return workspaces[0]
 }
 
 async function proxyRequest(
@@ -13,11 +23,11 @@ async function proxyRequest(
   method: string
 ) {
   try {
-    const apiKey = getApiKey(request)
+    const workspace = getActiveWorkspace(request)
 
-    if (!apiKey) {
+    if (!workspace) {
       return NextResponse.json(
-        { error: 'API key not configured. Go to /setup to configure.' },
+        { error: 'No workspace configured. Add a workspace from the setup wizard or Settings.' },
         { status: 401 }
       )
     }
@@ -27,10 +37,10 @@ async function proxyRequest(
     const searchParams = request.nextUrl.searchParams
     const queryString = searchParams.toString()
 
-    const url = `${TICKOS_API_URL}/api/v1/${path}${queryString ? `?${queryString}` : ''}`
+    const url = `${workspace.url}/api/v1/${path}${queryString ? `?${queryString}` : ''}`
 
     const headers: Record<string, string> = {
-      'Authorization': apiKey,
+      'Authorization': workspace.key,
       'Content-Type': 'application/json',
     }
 

@@ -9,13 +9,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Account } from "@/lib/api-client"
+
+export interface ConfiguredWorkspace {
+  name: string
+}
 
 interface WorkspaceSwitcherProps {
-  accounts: Account[]
-  selectedAccount: Account | null
-  onSelectAccount: (account: Account) => void
-  isCollapsed?: boolean
+  workspaces: ConfiguredWorkspace[]
+  activeWorkspace: string | null
+  onSwitch: (name: string) => void
 }
 
 function getInitials(name: string) {
@@ -28,40 +30,52 @@ function getInitials(name: string) {
 }
 
 export function WorkspaceSwitcher({
-  accounts,
-  selectedAccount,
-  onSelectAccount,
+  workspaces,
+  activeWorkspace,
+  onSwitch,
 }: WorkspaceSwitcherProps) {
+  const current = workspaces.find(w => w.name === activeWorkspace) || workspaces[0]
+
+  if (workspaces.length <= 1) {
+    return (
+      <div className="flex items-center gap-2 px-1.5 py-1 w-full">
+        <div className="h-7 w-7 flex items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-[10px] flex-shrink-0">
+          {current ? getInitials(current.name) : 'W'}
+        </div>
+        <span className="text-xs font-medium truncate flex-1 text-left">
+          {current?.name || 'No workspace'}
+        </span>
+      </div>
+    )
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-accent transition-colors outline-none w-full">
           <div className="h-7 w-7 flex items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-[10px] flex-shrink-0">
-            {selectedAccount ? getInitials(selectedAccount.name) : 'W'}
+            {current ? getInitials(current.name) : 'W'}
           </div>
           <span className="text-xs font-medium truncate flex-1 text-left">
-            {selectedAccount?.name || 'Workspace'}
+            {current?.name || 'Workspace'}
           </span>
           <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[240px]">
-        {accounts.map((account) => (
+      <DropdownMenuContent align="start" className="w-[200px]">
+        {workspaces.map((ws) => (
           <DropdownMenuItem
-            key={account.id}
-            onClick={() => onSelectAccount(account)}
+            key={ws.name}
+            onClick={() => onSwitch(ws.name)}
             className={cn(
               "gap-3 cursor-pointer",
-              selectedAccount?.id === account.id && "bg-accent"
+              activeWorkspace === ws.name && "bg-accent"
             )}
           >
             <div className="h-7 w-7 flex items-center justify-center rounded-md bg-primary text-primary-foreground font-semibold text-[10px] flex-shrink-0">
-              {getInitials(account.name)}
+              {getInitials(ws.name)}
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium truncate">{account.name}</span>
-              <span className="text-[10px] text-muted-foreground font-mono">{account.slug}</span>
-            </div>
+            <span className="text-xs font-medium truncate">{ws.name}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

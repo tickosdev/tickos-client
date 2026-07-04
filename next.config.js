@@ -20,23 +20,9 @@ const nextConfig = {
     ],
   },
 
-  // Environment variables exposed to browser
-  env: {
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    TICKOS_API_KEY: process.env.TICKOS_API_KEY,
-    TICKOS_USER_EMAIL: process.env.TICKOS_USER_EMAIL,
-  },
-
-  // Redirects & Rewrites for subdomain architecture
+  // Redirects & Rewrites
   async redirects() {
-    return [
-      {
-        source: '/docs',
-        destination: '/documentation',
-        permanent: true,
-      },
-    ]
+    return []
   },
 
   // Headers for security

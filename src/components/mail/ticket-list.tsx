@@ -1,9 +1,10 @@
 'use client'
 
+import * as React from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { cn } from '@/lib/utils'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Skeleton } from '@/components/ui/skeleton'
 import { getTicketStatusVariant, getTicketPriorityVariant, statusDotColor } from '@/components/ui/status-badge'
 import { Ticket } from '@/lib/api-client'
 import { Mail, MessageSquare, Paperclip } from 'lucide-react'
@@ -14,6 +15,33 @@ interface TicketListProps {
   onSelectTicket: (ticketId: string) => void
   selectedIds?: Set<string>
   onToggleSelect?: (ticketId: string) => void
+  isLoading?: boolean
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
+}
+
+// Fila fantasma mientras cargan los tickets
+function TicketRowSkeleton() {
+  return (
+    <div className="flex items-start gap-3 border-b border-border/50 px-4 py-3 border-l-2 border-l-transparent">
+      <div className="flex-shrink-0 pt-0.5 w-3.5" />
+      <div className="flex-shrink-0 pt-1.5 w-2" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-3 w-10" />
+        </div>
+        <Skeleton className="h-3 w-40" />
+        <div className="flex items-center gap-2.5">
+          <Skeleton className="h-3 w-14" />
+          <Skeleton className="h-3 w-14" />
+          <Skeleton className="h-5 w-5 rounded-full ml-auto" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const priorityBorderColors: Record<string, string> = {
@@ -54,9 +82,44 @@ export function TicketList({
   onSelectTicket,
   selectedIds = new Set(),
   onToggleSelect,
+  isLoading,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: TicketListProps) {
+  // Scroll infinito: sentinel al final de la lista que dispara onLoadMore
+  const sentinelRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore || !onLoadMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) onLoadMore()
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, onLoadMore, tickets.length])
+
+  if (isLoading) {
+    return (
+      <div className="h-full overflow-y-auto scrollbar-hide">
+        <div className="flex flex-col">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <TicketRowSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Scroll nativo (con scrollbar oculto): el ScrollArea de Radix usa
+  // display:table internamente y rompe el truncado del contenido
   return (
-    <ScrollArea className="h-full">
+    <div className="h-full overflow-y-auto scrollbar-hide">
       <div className="flex flex-col">
         {tickets.length === 0 ? (
           <div className="flex items-center justify-center py-12 text-xs text-muted-foreground font-mono">
@@ -181,7 +244,29 @@ export function TicketList({
             </div>
           ))
         )}
+
+        {/* Scroll infinito: skeletons mientras carga + boton Load more + sentinel */}
+        {tickets.length > 0 && (
+          <>
+            {isLoadingMore && (
+              <>
+                <TicketRowSkeleton />
+                <TicketRowSkeleton />
+              </>
+            )}
+            {hasMore && !isLoadingMore && (
+              <button
+                onClick={onLoadMore}
+                className="w-full py-3 text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors"
+              >
+                Load more
+              </button>
+            )}
+            {/* Sentinel: dispara la carga automatica al acercarse al final */}
+            <div ref={sentinelRef} className="h-px flex-shrink-0" />
+          </>
+        )}
       </div>
-    </ScrollArea>
+    </div>
   )
 }

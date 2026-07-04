@@ -207,7 +207,7 @@ export interface TicketFilters {
   tag_id?: string
   archived?: boolean
   is_read?: boolean
-  snoozed?: boolean
+  snoozed?: 'only_snoozed' | 'exclude_snoozed' | 'all'
   search?: string
   sort_by?: 'created_at' | 'updated_at' | 'priority'
   sort_order?: 'asc' | 'desc'
@@ -280,7 +280,11 @@ export async function getInboxes(params?: { page?: number; limit?: number }): Pr
 // ---------------------------------------------------
 
 export async function getCustomer(customerId: string): Promise<{ data: CustomerDetail }> {
-  return request(`/customers/${customerId}`)
+  // La API v1 devuelve el customer directamente (sin envolver en { data })
+  const response = await request<CustomerDetail & { data?: CustomerDetail }>(
+    `/customers/${customerId}`
+  )
+  return { data: response.data ?? response }
 }
 
 // ---------------------------------------------------
@@ -292,7 +296,9 @@ export async function getTickets(params?: TicketFilters): Promise<ApiResponse<Ti
 }
 
 export async function getTicket(id: string): Promise<{ data: Ticket }> {
-  return request(`/tickets/${id}`)
+  // La API v1 devuelve el ticket directamente (sin envolver en { data })
+  const response = await request<Ticket & { data?: Ticket }>(`/tickets/${id}`)
+  return { data: response.data ?? response }
 }
 
 // PATCH /tickets/[id] — actualizar campos directos (subject, description)
@@ -356,10 +362,17 @@ export async function getTicketMessages(ticketId: string, params?: MessageFilter
   return request(`/tickets/${ticketId}/messages${buildQuery(params)}`)
 }
 
+export interface ReplyAttachment {
+  fileName: string
+  fileData: string // base64 sin prefijo data:
+  contentType: string
+}
+
 export async function createReply(ticketId: string, data: {
   body_html?: string
   body_text?: string
   direction?: 'outbound' | 'internal'
+  attachments?: ReplyAttachment[]
 }): Promise<{ data: Message }> {
   return request(`/tickets/${ticketId}/messages`, {
     method: 'POST',

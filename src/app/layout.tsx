@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   description: 'Open-source ticket inbox powered by TickOS API. Deploy your own support desk in seconds.',
   keywords: ['ticketing system', 'support desk', 'API', 'developers', 'customer support', 'open source'],
   authors: [{ name: 'TickOS' }],
+  icons: {
+    icon: '/dark.png',
+    apple: '/dark.png',
+  },
   openGraph: {
     title: 'TickOS Client - Support Desk for Developers',
     description: 'Open-source ticket inbox powered by TickOS API. Deploy your own support desk in seconds.',
