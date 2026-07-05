@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Search } from "lucide-react"
+import { Search, RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -59,6 +60,17 @@ export function TickosClient() {
   // Workspace state
   const [workspaces, setWorkspaces] = React.useState<ConfiguredWorkspace[]>([])
   const [activeWorkspace, setActiveWorkspace] = React.useState<string | null>(null)
+
+  // Smart polling: sincronización delta silenciosa
+  const lastSyncRef = React.useRef<string | null>(null)
+  const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
+  // Refs estables para evitar recrear el interval en cada render
+  const selectedInboxRef = React.useRef(selectedInbox)
+  const selectedTicketIdRef = React.useRef(selectedTicketId)
+  const getTicketFiltersRef = React.useRef(getTicketFilters)
+  React.useEffect(() => { selectedInboxRef.current = selectedInbox }, [selectedInbox])
+  React.useEffect(() => { selectedTicketIdRef.current = selectedTicketId }, [selectedTicketId])
+  React.useEffect(() => { getTicketFiltersRef.current = getTicketFilters }, [getTicketFilters])
 
   // Keyboard shortcuts (J/K navigation)
   React.useEffect(() => {
@@ -192,6 +204,8 @@ export function TickosClient() {
         limit: 50,
       })
       setTickets(response.data)
+      // Marcar timestamp de sincronización para el polling delta
+      lastSyncRef.current = new Date().toISOString()
       // Fallback: si el server no reporta total, asumir que hay mas si vino la pagina llena
       const total = response.pagination?.total ?? 0
       setHasMoreTickets(total > 0 ? response.data.length < total : response.data.length === 50)
@@ -271,6 +285,76 @@ export function TickosClient() {
     }
   }
 
+  // ── Smart Polling: sincronización delta cada 5s ──────────────────
+  // Trae solo tickets actualizados desde la última sincronización
+  // y los mergea silenciosamente sin loading states ni flicker.
+  // Usa refs para leer siempre el valor más reciente sin recrear el interval.
+  const pollForUpdates = React.useCallback(async () => {
+    const inbox = selectedInboxRef.current
+    if (!inbox || !lastSyncRef.current) return
+
+    try {
+      const filters = getTicketFiltersRef.current(inbox.id)
+      const response = await getTickets({
+        ...filters,
+        updated_after: lastSyncRef.current,
+        limit: 50,
+      }, { headers: { 'x-no-log': 'true' } })
+
+      const updatedTickets = response.data
+      if (updatedTickets.length === 0) return
+
+      // Actualizar timestamp de sincronización
+      lastSyncRef.current = new Date().toISOString()
+
+      setTickets(prev => {
+        const existingMap = new Map(prev.map(t => [t.id, t]))
+        const newTickets: typeof prev = []
+
+        for (const ticket of updatedTickets) {
+          if (existingMap.has(ticket.id)) {
+            // Actualizar ticket existente en su posición
+            existingMap.set(ticket.id, ticket)
+          } else {
+            // Ticket nuevo: agregar al inicio
+            newTickets.push(ticket)
+          }
+        }
+
+        return [...newTickets, ...prev.map(t => existingMap.get(t.id)!)]
+      })
+
+      // Si el ticket seleccionado recibió actualización, refrescar mensajes
+      const currentTicketId = selectedTicketIdRef.current
+      if (currentTicketId && updatedTickets.some(t => t.id === currentTicketId)) {
+        loadMessages(currentTicketId, { silent: true })
+      }
+    } catch {
+      // Silenciar errores del polling para no molestar al usuario
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Iniciar/detener polling cuando hay inbox seleccionado
+  React.useEffect(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+
+    if (selectedInbox && !searchQuery) {
+      // Solo activar polling cuando no hay búsqueda activa
+      pollIntervalRef.current = setInterval(pollForUpdates, 5000)
+    }
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+    }
+  }, [selectedInbox, searchQuery, pollForUpdates])
+
   const handleSelectInbox = (inbox: InboxType) => {
     setSelectedInbox(inbox)
     setSelectedTicketId(null)
@@ -337,7 +421,19 @@ export function TickosClient() {
                   {tickets.length}
                 </span>
               </div>
-              <ComposeDialog inboxes={inboxes} onSent={loadTickets} />
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={loadTickets}
+                  disabled={isLoadingTickets}
+                  title="Refrescar tickets"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isLoadingTickets ? 'animate-spin' : ''}`} />
+                </Button>
+                <ComposeDialog inboxes={inboxes} onSent={loadTickets} />
+              </div>
             </div>
 
             <Separator />

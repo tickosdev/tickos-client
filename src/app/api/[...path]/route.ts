@@ -44,6 +44,10 @@ async function proxyRequest(
       'Content-Type': 'application/json',
     }
 
+    // Pasar header de no-log para que el polling silencioso no llene los logs
+    const noLog = request.headers.get('x-no-log')
+    if (noLog) headers['x-no-log'] = noLog
+
     // no-store: evita que Next reutilice respuestas del API (datos siempre frescos)
     const fetchOptions: RequestInit = { method, headers, cache: 'no-store' }
 

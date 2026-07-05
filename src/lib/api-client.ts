@@ -214,6 +214,7 @@ export interface TicketFilters {
   sort_order?: 'asc' | 'desc'
   limit?: number
   offset?: number
+  updated_after?: string
 }
 
 export interface MessageFilters {
@@ -294,8 +295,8 @@ export async function getCustomer(customerId: string): Promise<{ data: CustomerD
 // API: Tickets
 // ---------------------------------------------------
 
-export async function getTickets(params?: TicketFilters): Promise<ApiResponse<Ticket[]>> {
-  return request(`/tickets${buildQuery(params)}`)
+export async function getTickets(params?: TicketFilters, options?: { headers?: Record<string, string> }): Promise<ApiResponse<Ticket[]>> {
+  return request(`/tickets${buildQuery(params)}`, options?.headers ? { headers: options.headers } : undefined)
 }
 
 export async function getTicket(id: string): Promise<{ data: Ticket }> {

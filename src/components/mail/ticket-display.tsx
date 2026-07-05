@@ -526,7 +526,7 @@ export function TicketDisplay({ ticket, messages, isLoadingMessages, onTicketUpd
               No messages
             </p>
           ) : (
-            messages.map((message: Message) => (
+            [...messages].reverse().map((message: Message) => (
               <div
                 key={message.id}
                 className={cn(

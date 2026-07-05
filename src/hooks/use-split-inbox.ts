@@ -80,6 +80,15 @@ const DEFAULT_VIEWS: SplitInboxView[] = [
     is_visible: true,
     order: 4,
   },
+  {
+    id: 'view_snoozed',
+    name: 'Snoozed',
+    filters: { show_snoozed: 'only', show_archived: 'exclude' },
+    sort_order: 'desc',
+    is_default: true,
+    is_visible: true,
+    order: 5,
+  },
 ]
 
 // ---------------------------------------------------
@@ -120,7 +129,7 @@ const splitViewsAtom = atomWithStorage<SplitInboxView[]>('tickos_split_views', D
 const activeViewIdAtom = atomWithStorage<string>('tickos_active_view', 'view_all')
 // Version del esquema de vistas: permite migrar localStorage de usuarios previos
 const splitViewsVersionAtom = atomWithStorage<number>('tickos_split_views_version', 0)
-const CURRENT_VIEWS_VERSION = 2
+const CURRENT_VIEWS_VERSION = 3
 
 // ---------------------------------------------------
 // Hook
