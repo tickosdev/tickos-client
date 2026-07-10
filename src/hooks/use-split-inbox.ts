@@ -1,9 +1,16 @@
 'use client'
 
 import * as React from 'react'
-import { useAtom, useSetAtom } from 'jotai'
+import { atom, useAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
-import { TicketFilters } from '@/lib/api-client'
+import {
+  TicketFilters,
+  SplitViewRow,
+  getSplitViews,
+  createSplitView,
+  updateSplitView,
+  deleteSplitView,
+} from '@/lib/api-client'
 
 // ---------------------------------------------------
 // Types
@@ -31,69 +38,21 @@ export interface SplitInboxView {
 }
 
 // ---------------------------------------------------
-// Default views
-// ---------------------------------------------------
-
-const DEFAULT_VIEWS: SplitInboxView[] = [
-  {
-    id: 'view_all',
-    name: 'All',
-    filters: {},
-    sort_order: 'desc',
-    is_default: true,
-    is_visible: true,
-    order: 0,
-  },
-  {
-    id: 'view_inbox',
-    name: 'Inbox',
-    filters: { status: ['open', 'pending', 'review'], show_archived: 'exclude' },
-    sort_order: 'desc',
-    is_default: true,
-    is_visible: true,
-    order: 1,
-  },
-  {
-    id: 'view_waiting',
-    name: 'Waiting',
-    filters: { status: ['pending'], show_archived: 'exclude' },
-    sort_order: 'desc',
-    is_default: true,
-    is_visible: true,
-    order: 2,
-  },
-  {
-    id: 'view_unread',
-    name: 'Unread',
-    filters: { read_status: 'unread', show_archived: 'exclude' },
-    sort_order: 'desc',
-    is_default: true,
-    is_visible: true,
-    order: 3,
-  },
-  {
-    id: 'view_archived',
-    name: 'Archived',
-    filters: { show_archived: 'only' },
-    sort_order: 'desc',
-    is_default: true,
-    is_visible: true,
-    order: 4,
-  },
-  {
-    id: 'view_snoozed',
-    name: 'Snoozed',
-    filters: { show_snoozed: 'only', show_archived: 'exclude' },
-    sort_order: 'desc',
-    is_default: true,
-    is_visible: true,
-    order: 5,
-  },
-]
-
-// ---------------------------------------------------
 // Helpers
 // ---------------------------------------------------
+
+// Convierte la fila del API (tabla split_inbox_views) a la vista local
+function rowToView(row: SplitViewRow): SplitInboxView {
+  return {
+    id: row.id,
+    name: row.name,
+    filters: (row.filters || {}) as SplitInboxFilters,
+    sort_order: row.sort_order || 'desc',
+    is_default: row.is_default,
+    is_visible: row.is_visible,
+    order: row.display_order,
+  }
+}
 
 // Convierte los filtros de una vista a TicketFilters para el API.
 // Los valores multiples (status, priority) se envian separados por coma.
@@ -122,14 +81,58 @@ export function buildTicketFilters(view: SplitInboxView | undefined, inboxId?: s
 }
 
 // ---------------------------------------------------
-// Atoms (persisted in localStorage)
+// Atoms
+// Las vistas viven en el API de tickos (tabla split_inbox_views);
+// solo la vista activa (preferencia de UI) se guarda en localStorage.
 // ---------------------------------------------------
 
-const splitViewsAtom = atomWithStorage<SplitInboxView[]>('tickos_split_views', DEFAULT_VIEWS)
-const activeViewIdAtom = atomWithStorage<string>('tickos_active_view', 'view_all')
-// Version del esquema de vistas: permite migrar localStorage de usuarios previos
-const splitViewsVersionAtom = atomWithStorage<number>('tickos_split_views_version', 0)
-const CURRENT_VIEWS_VERSION = 3
+const splitViewsAtom = atom<SplitInboxView[]>([])
+const activeViewIdAtom = atomWithStorage<string>('tickos_active_view', '')
+
+// Migracion one-time: sube al API las vistas custom que el usuario
+// tenia en localStorage (version anterior del hook) y limpia las keys.
+async function migrateLocalViews(loaded: SplitInboxView[]): Promise<SplitInboxView[]> {
+  try {
+    const raw = window.localStorage.getItem('tickos_split_views')
+    if (!raw) return loaded
+    const stored: SplitInboxView[] = JSON.parse(raw)
+    const customs = (Array.isArray(stored) ? stored : []).filter(v => v && v.is_default === false)
+    const result = [...loaded]
+    for (const v of customs) {
+      // Evitar duplicados si la migracion corre mas de una vez
+      if (result.some(x => x.name === v.name)) continue
+      const res = await createSplitView({
+        name: v.name,
+        filters: (v.filters || {}) as Record<string, unknown>,
+        sort_order: v.sort_order || 'desc',
+      })
+      result.push(rowToView(res.data))
+    }
+    window.localStorage.removeItem('tickos_split_views')
+    window.localStorage.removeItem('tickos_split_views_version')
+    return result
+  } catch (err) {
+    console.error('Error migrating local split views:', err)
+    return loaded
+  }
+}
+
+// Evita cargas duplicadas cuando varios componentes montan el hook
+let loadPromise: Promise<SplitInboxView[]> | null = null
+
+function loadViewsOnce(): Promise<SplitInboxView[]> {
+  if (!loadPromise) {
+    loadPromise = getSplitViews()
+      .then(res => (res.data || []).map(rowToView))
+      .then(migrateLocalViews)
+      .catch(err => {
+        console.error('Error loading split views:', err)
+        loadPromise = null // permitir reintento en el proximo mount
+        return []
+      })
+  }
+  return loadPromise
+}
 
 // ---------------------------------------------------
 // Hook
@@ -139,94 +142,73 @@ export function useSplitInbox() {
   const [views, setViews] = useAtom(splitViewsAtom)
   const [activeViewId, setActiveViewId] = useAtom(activeViewIdAtom)
 
-  const setViewsVersion = useSetAtom(splitViewsVersionAtom)
-
-  // Migracion: agregar vistas por defecto nuevas y actualizar filtros de
-  // vistas default (una sola vez por version).
-  // IMPORTANTE: se lee localStorage directo porque atomWithStorage hidrata
-  // DESPUES del primer render; usar el valor del atom aqui veria siempre los
-  // defaults y sobreescribiria las vistas custom del usuario en cada carga.
+  // Carga inicial desde el API (el servidor seedea las vistas por defecto)
   React.useEffect(() => {
-    try {
-      const rawVersion = window.localStorage.getItem('tickos_split_views_version')
-      const version = rawVersion ? Number(JSON.parse(rawVersion)) : 0
-      if (version >= CURRENT_VIEWS_VERSION) return
-
-      const rawViews = window.localStorage.getItem('tickos_split_views')
-      const stored: SplitInboxView[] = rawViews ? JSON.parse(rawViews) : [...DEFAULT_VIEWS]
-
-      let next = [...stored]
-      const missing = DEFAULT_VIEWS.filter(d => !next.some(v => v.id === d.id))
-      if (missing.length > 0) next = [...next, ...missing]
-
-      // v2: Inbox ahora incluye pending (open, pending, review)
-      next = next.map(v =>
-        v.id === 'view_inbox'
-          ? { ...v, filters: { status: ['open', 'pending', 'review'], show_archived: 'exclude' as const } }
-          : v
-      )
-
-      setViews(next)
-      setViewsVersion(CURRENT_VIEWS_VERSION)
-    } catch (err) {
-      console.error('Error migrating split views:', err)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    let cancelled = false
+    loadViewsOnce().then(loaded => {
+      if (!cancelled && loaded.length > 0) setViews(loaded)
+    })
+    return () => { cancelled = true }
+  }, [setViews])
 
   const visibleViews = views
     .filter(v => v.is_visible)
     .sort((a, b) => a.order - b.order)
 
-  const activeView = views.find(v => v.id === activeViewId) || views[0]
+  // Si la vista activa guardada ya no existe (o aun no carga), usar la primera
+  const activeView = views.find(v => v.id === activeViewId) || visibleViews[0] || views[0]
 
-  const createView = (name: string, filters: SplitInboxFilters = {}, sort_order: 'desc' | 'asc' = 'desc') => {
-    const id = `view_${Date.now()}`
-    const maxOrder = Math.max(...views.map(v => v.order), -1)
-    const newView: SplitInboxView = {
-      id,
-      name,
-      filters,
-      sort_order,
-      is_default: false,
-      is_visible: true,
-      order: maxOrder + 1,
+  const createView = async (name: string, filters: SplitInboxFilters = {}, sort_order: 'desc' | 'asc' = 'desc') => {
+    try {
+      const res = await createSplitView({
+        name,
+        filters: filters as Record<string, unknown>,
+        sort_order,
+      })
+      const view = rowToView(res.data)
+      setViews(prev => [...prev, view])
+      return view
+    } catch (err) {
+      console.error('Error creating split view:', err)
+      return null
     }
-    setViews([...views, newView])
-    return newView
   }
 
-  const updateView = (id: string, updates: Partial<Omit<SplitInboxView, 'id' | 'is_default'>>) => {
-    setViews(views.map(v => {
-      if (v.id !== id) return v
-      // "All" default view can only toggle visibility
-      if (v.id === 'view_all' && v.is_default) {
-        return { ...v, is_visible: updates.is_visible ?? v.is_visible }
+  const updateView = async (id: string, updates: Partial<Omit<SplitInboxView, 'id' | 'is_default'>>) => {
+    const current = views.find(v => v.id === id)
+    if (!current) return
+    // La vista "All" por defecto solo permite cambiar visibilidad (regla del API)
+    const isAllView = current.is_default && current.name === 'All'
+    try {
+      const res = await updateSplitView(id, isAllView
+        ? { is_visible: updates.is_visible }
+        : {
+            ...(updates.name !== undefined ? { name: updates.name } : {}),
+            ...(updates.filters !== undefined ? { filters: updates.filters as Record<string, unknown> } : {}),
+            ...(updates.sort_order !== undefined ? { sort_order: updates.sort_order } : {}),
+            ...(updates.is_visible !== undefined ? { is_visible: updates.is_visible } : {}),
+            ...(updates.order !== undefined ? { display_order: updates.order } : {}),
+          })
+      const view = rowToView(res.data)
+      setViews(prev => prev.map(v => (v.id === id ? view : v)))
+    } catch (err) {
+      console.error('Error updating split view:', err)
+    }
+  }
+
+  const deleteView = async (id: string) => {
+    const current = views.find(v => v.id === id)
+    // La vista "All" por defecto no se puede eliminar
+    if (current && current.is_default && current.name === 'All') return
+    try {
+      await deleteSplitView(id)
+      setViews(prev => prev.filter(v => v.id !== id))
+      if (activeViewId === id) {
+        setActiveViewId('')
       }
-      return { ...v, ...updates }
-    }))
-  }
-
-  const deleteView = (id: string) => {
-    // Cannot delete "All" default view
-    if (id === 'view_all') return
-    setViews(views.filter(v => v.id !== id))
-    if (activeViewId === id) {
-      setActiveViewId('view_all')
+    } catch (err) {
+      console.error('Error deleting split view:', err)
     }
-  }
-
-  const reorderViews = (viewIds: string[]) => {
-    setViews(views.map(v => {
-      const idx = viewIds.indexOf(v.id)
-      if (idx === -1) return v
-      return { ...v, order: idx }
-    }))
-  }
-
-  const resetToDefaults = () => {
-    setViews(DEFAULT_VIEWS)
-    setActiveViewId('view_all')
   }
 
   // Convert SplitInboxFilters to TicketFilters for API calls
@@ -243,8 +225,6 @@ export function useSplitInbox() {
     createView,
     updateView,
     deleteView,
-    reorderViews,
-    resetToDefaults,
     getTicketFilters,
   }
 }

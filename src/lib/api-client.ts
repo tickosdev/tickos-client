@@ -406,6 +406,56 @@ export async function removeTagFromTicket(ticketId: string, tagId: string): Prom
 }
 
 // ---------------------------------------------------
+// API: Split Inbox Views (persistidas por usuario en tickos)
+// ---------------------------------------------------
+
+export interface SplitViewRow {
+  id: string
+  name: string
+  filters: Record<string, unknown>
+  sort_order: 'desc' | 'asc'
+  display_order: number
+  is_default: boolean
+  is_visible: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export async function getSplitViews(): Promise<ApiResponse<SplitViewRow[]>> {
+  return request('/split-inbox-views')
+}
+
+export async function createSplitView(data: {
+  name: string
+  filters?: Record<string, unknown>
+  sort_order?: 'desc' | 'asc'
+}): Promise<{ data: SplitViewRow }> {
+  return request('/split-inbox-views', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateSplitView(id: string, data: {
+  name?: string
+  filters?: Record<string, unknown>
+  sort_order?: 'desc' | 'asc'
+  is_visible?: boolean
+  display_order?: number
+}): Promise<{ data: SplitViewRow }> {
+  return request(`/split-inbox-views/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteSplitView(id: string): Promise<void> {
+  return request(`/split-inbox-views/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+// ---------------------------------------------------
 // API: Bulk Actions
 // El API v1 no tiene endpoints bulk: se hace fan-out por ticket
 // usando /manage y DELETE. Si alguna falla, se lanza error.

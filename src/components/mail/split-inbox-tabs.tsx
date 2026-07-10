@@ -12,7 +12,7 @@ interface SplitInboxTabsProps {
 }
 
 export function SplitInboxTabs({ onViewChange }: SplitInboxTabsProps) {
-  const { visibleViews, activeViewId, setActiveViewId } = useSplitInbox()
+  const { visibleViews, activeView, setActiveViewId } = useSplitInbox()
 
   const [settingsOpen, setSettingsOpen] = React.useState(false)
   const [settingsScreen, setSettingsScreen] = React.useState<'list' | 'create'>('list')
@@ -46,7 +46,7 @@ export function SplitInboxTabs({ onViewChange }: SplitInboxTabsProps) {
     load()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewsKey, activeViewId])
+  }, [viewsKey, activeView?.id])
 
   const handleSelect = (viewId: string) => {
     setActiveViewId(viewId)
@@ -92,14 +92,14 @@ export function SplitInboxTabs({ onViewChange }: SplitInboxTabsProps) {
               onClick={() => handleSelect(view.id)}
               className={cn(
                 'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors',
-                view.id === activeViewId
+                view.id === activeView?.id
                   ? 'bg-accent text-foreground font-medium'
                   : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
               )}
             >
               <span className={cn(
                 'h-1.5 w-1.5 rounded-full flex-shrink-0',
-                view.id === activeViewId ? 'bg-primary' : 'bg-muted-foreground/40'
+                view.id === activeView?.id ? 'bg-primary' : 'bg-muted-foreground/40'
               )} />
               <span className="truncate flex-1 text-left">{view.name}</span>
               {counts[view.id] !== undefined && (

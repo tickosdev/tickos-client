@@ -152,7 +152,8 @@ export function SplitInboxSettings({ open, onOpenChange, initialScreen = 'list',
 
             <div className="divide-y">
               {sortedViews.map(view => {
-                const isAll = view.id === 'view_all'
+                // La vista "All" por defecto no es editable (regla del API)
+                const isAll = view.is_default && view.name === 'All'
                 return (
                   <button
                     key={view.id}
@@ -188,19 +189,20 @@ export function SplitInboxSettings({ open, onOpenChange, initialScreen = 'list',
             tags={tags}
             inboxes={inboxes}
             onBack={() => setScreen('list')}
-            onSave={(name, filters, sortOrder) => {
+            onSave={async (name, filters, sortOrder) => {
+              // Esperar la respuesta del API antes de refrescar contadores
               if (screen === 'create') {
-                createView(name, filters, sortOrder)
+                await createView(name, filters, sortOrder)
               } else if (editingView) {
-                updateView(editingView.id, { name, filters, sort_order: sortOrder })
+                await updateView(editingView.id, { name, filters, sort_order: sortOrder })
               }
               setScreen('list')
               onChanged?.()
             }}
             onDelete={
-              screen !== 'create' && editingView && editingView.id !== 'view_all'
-                ? () => {
-                    deleteView(editingView.id)
+              screen !== 'create' && editingView && !(editingView.is_default && editingView.name === 'All')
+                ? async () => {
+                    await deleteView(editingView.id)
                     setScreen('list')
                     onChanged?.()
                   }

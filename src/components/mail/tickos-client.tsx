@@ -40,8 +40,9 @@ export function TickosClient() {
   const [tickets, setTickets] = useAtom(ticketsAtom)
   const [selectedTicketId, setSelectedTicketId] = useAtom(selectedTicketIdAtom)
 
-  // Split inbox
-  const { activeViewId, getTicketFilters } = useSplitInbox()
+  // Split inbox (las vistas cargan async del API: activeView?.id
+  // cambia al terminar la carga y dispara el refetch de tickets)
+  const { activeView, getTicketFilters } = useSplitInbox()
 
   // Local state
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -114,7 +115,7 @@ export function TickosClient() {
       loadTickets()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedInbox, activeViewId, searchQuery])
+  }, [selectedInbox, activeView?.id, searchQuery])
 
   // Load messages when ticket changes
   React.useEffect(() => {
