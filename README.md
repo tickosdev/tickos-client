@@ -170,6 +170,39 @@ The client implements a complete TypeScript client for the TickOS REST API v1:
 | `TICKOS_SESSION_SECRET` | Yes | Random string to sign JWT session cookies |
 | `TICKOS_WORKSPACES` | No | JSON array to pre-seed workspaces (otherwise configure via UI) |
 
+## Configuring the TickOS API URL
+
+The client is **not tied to a fixed API URL at build time**. Each workspace stores its own API URL, and every request (login + API proxy) uses the URL of the active workspace.
+
+There are two ways to set it:
+
+1. **Via the UI (recommended)** — On first run, the setup wizard asks for the API URL and an API key. You can also add/edit workspaces later from **Settings → Workspaces**. The config is persisted server-side in `data/workspaces.json` (git-ignored, never sent to the browser).
+
+2. **Via environment variable** — Pre-seed one or more workspaces with `TICKOS_WORKSPACES`:
+
+   ```env
+   TICKOS_WORKSPACES=[{"name":"My Workspace","url":"https://api.tickos.dev","key":"sk_xxx"}]
+   ```
+
+### Which URL should I use?
+
+| Environment | URL |
+|-------------|-----|
+| Production (TickOS cloud) | `https://api.tickos.dev` |
+| Self-hosted tickos-core | `https://api.your-domain.com` (your own API domain) |
+| Local development (tickos-core running locally) | `http://localhost:3000` |
+
+### Changing the default suggested URL
+
+`https://api.tickos.dev` appears only as the **pre-filled default** in the UI. If you fork this project and want a different default, change it in these two files:
+
+| File | What |
+|------|------|
+| `src/app/login/page.tsx` | Initial value of the API URL field in the setup wizard |
+| `src/components/mail/settings-dialog.tsx` | Initial value of the API URL field when adding a workspace from Settings |
+
+No other code references the API host — the proxy (`src/app/api/[...path]/route.ts`) and the login route always read the URL from the active workspace config.
+
 ## Self-Hosting
 
 ### Docker
