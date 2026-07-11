@@ -1,8 +1,14 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 
+if (!process.env.TICKOS_SESSION_SECRET) {
+  throw new Error(
+    'TICKOS_SESSION_SECRET is not set. Please configure it in your environment variables.'
+  )
+}
+
 const SESSION_SECRET = new TextEncoder().encode(
-  process.env.TICKOS_SESSION_SECRET || 'tickos-client-default-secret-change-me'
+  process.env.TICKOS_SESSION_SECRET
 )
 
 const COOKIE_NAME = 'tickos-session'
