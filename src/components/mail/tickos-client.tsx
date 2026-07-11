@@ -32,6 +32,7 @@ import {
   inboxesAtom,
 } from "@/lib/store"
 import { useSplitInbox } from "@/hooks/use-split-inbox"
+import { initializeAudioContext, playNotificationSound } from "@/lib/notification-sound"
 
 export function TickosClient() {
   // Global state
@@ -69,9 +70,29 @@ export function TickosClient() {
   const selectedInboxRef = React.useRef(selectedInbox)
   const selectedTicketIdRef = React.useRef(selectedTicketId)
   const getTicketFiltersRef = React.useRef(getTicketFilters)
+  // IDs de tickets ya conocidos: para detectar tickets NUEVOS en el
+  // polling delta y disparar el sonido de notificación
+  const knownTicketIdsRef = React.useRef<Set<string>>(new Set())
   React.useEffect(() => { selectedInboxRef.current = selectedInbox }, [selectedInbox])
   React.useEffect(() => { selectedTicketIdRef.current = selectedTicketId }, [selectedTicketId])
   React.useEffect(() => { getTicketFiltersRef.current = getTicketFilters }, [getTicketFilters])
+  React.useEffect(() => { knownTicketIdsRef.current = new Set(tickets.map(t => t.id)) }, [tickets])
+
+  // Desbloquear el AudioContext en la primera interacción del usuario
+  // (los navegadores bloquean audio hasta que haya un gesto)
+  React.useEffect(() => {
+    const unlock = () => {
+      initializeAudioContext()
+      window.removeEventListener('click', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+    window.addEventListener('click', unlock)
+    window.addEventListener('keydown', unlock)
+    return () => {
+      window.removeEventListener('click', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
 
   // Keyboard shortcuts (J/K navigation)
   React.useEffect(() => {
@@ -324,6 +345,12 @@ export function TickosClient() {
 
         return [...newTickets, ...prev.map(t => existingMap.get(t.id)!)]
       })
+
+      // Sonido de notificación al llegar tickets nuevos
+      // (mismo sonido de la versión de tickets de tickos-core)
+      if (updatedTickets.some(t => !knownTicketIdsRef.current.has(t.id))) {
+        playNotificationSound()
+      }
 
       // Si el ticket seleccionado recibió actualización, refrescar mensajes
       const currentTicketId = selectedTicketIdRef.current
