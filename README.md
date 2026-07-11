@@ -13,6 +13,8 @@ A modern, mail-style ticket inbox for support agents. Built with Next.js 15, pow
 
 [Demo](https://tickos.dev) &bull; [Documentation](https://tickos.dev/docs) &bull; [Report Bug](https://github.com/tickosdev/tickos-client-desk/issues)
 
+<img src="docs/screenshot.png" alt="TickOS Client Desk" width="100%" />
+
 ---
 
 </div>
